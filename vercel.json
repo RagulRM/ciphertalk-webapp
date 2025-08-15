@@ -1,41 +1,8 @@
 {
-  "version": 2,
-  "name": "ciphertalk-frontend",
-  "functions": {},
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/client/$1"
-    }
-  ],
   "rewrites": [
     {
       "source": "/",
       "destination": "/client/index.html"
-    },
-    {
-      "source": "/contacts.html",
-      "destination": "/client/contacts.html"
-    },
-    {
-      "source": "/contacts.js",
-      "destination": "/client/contacts.js"
-    },
-    {
-      "source": "/script.js",
-      "destination": "/client/script.js"
-    },
-    {
-      "source": "/style.css",
-      "destination": "/client/style.css"
-    },
-    {
-      "source": "/contacts.css",
-      "destination": "/client/contacts.css"
-    },
-    {
-      "source": "/resources/(.*)",
-      "destination": "/client/resources/$1"
     },
     {
       "source": "/(.*)",
