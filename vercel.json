@@ -1,14 +1,3 @@
 {
-  "buildCommand": "",
-  "outputDirectory": "client",
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/$1"
-    }
-  ]
+  "version": 2
 }
