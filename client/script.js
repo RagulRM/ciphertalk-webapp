@@ -5,9 +5,9 @@ const getServerURL = () => {
         return 'http://127.0.0.1:3000';
     }
     
-    // Check if we're on Vercel (production frontend)
-    if (window.location.hostname.includes('vercel.app')) {
-        // Replace with your Railway backend URL
+    // Check if we're on production (Vercel or custom domain)
+    if (window.location.hostname.includes('vercel.app') || window.location.hostname === 'ciphertalk.dev') {
+        // Railway backend URL
         return 'https://ciphertalk-app-production.up.railway.app';
     }
     
@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const password = document.getElementById('registerPassword').value;
         const passkey = document.getElementById('registerPasskey').value;
         
+        console.log('Registration attempt:', { username, serverURL: getServerURL() });
+        
         try {
             // Check if username exists
             const checkResponse = await fetch(`${getServerURL()}/check-username`, {
@@ -67,6 +69,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({ username })
             });
+            
+            console.log('Check username response:', checkResponse.status, checkResponse.statusText);
+            
+            if (!checkResponse.ok) {
+                throw new Error(`Server error: ${checkResponse.status} ${checkResponse.statusText}`);
+            }
             
             const checkResult = await checkResponse.json();
             

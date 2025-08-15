@@ -5,9 +5,9 @@ const SERVER_URL = (() => {
         return 'http://127.0.0.1:3000';
     }
     
-    // Check if we're on Vercel (production frontend)
-    if (window.location.hostname.includes('vercel.app')) {
-        // Replace with your Railway backend URL
+    // Check if we're on production (Vercel or custom domain)
+    if (window.location.hostname.includes('vercel.app') || window.location.hostname === 'ciphertalk.dev') {
+        // Railway backend URL
         return 'https://ciphertalk-app-production.up.railway.app';
     }
     
