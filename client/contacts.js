@@ -1,9 +1,19 @@
 // Dynamic server URL based on environment
-const SERVER_URL = window.location.protocol === 'https:' 
-    ? `https://${window.location.host}` 
-    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://127.0.0.1:3000'
-        : `https://${window.location.host}`;
+const SERVER_URL = (() => {
+    // Check if we're on localhost (development)
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://127.0.0.1:3000';
+    }
+    
+    // Check if we're on Vercel (production frontend)
+    if (window.location.hostname.includes('vercel.app')) {
+        // Replace with your Railway backend URL
+        return 'https://YOUR_RAILWAY_APP_URL.railway.app';
+    }
+    
+    // Fallback for other production environments
+    return `${window.location.protocol}//${window.location.hostname}:3000`;
+})();
 let currentUser = null;
 let selectedUser = null;
 

@@ -1,0 +1,13 @@
+{
+  "name": "ciphertalk-frontend",
+  "version": "1.0.0",
+  "description": "CipherTalk Frontend - Secure messaging with encryption and steganography",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'Static build ready'",
+    "start": "echo 'Static files ready to serve'"
+  },
+  "keywords": ["encryption", "steganography", "secure", "messaging"],
+  "author": "RagulRM",
+  "license": "MIT"
+}

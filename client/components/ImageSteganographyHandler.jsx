@@ -4,10 +4,18 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // Dynamic server URL configuration
 const getServerURL = () => {
+  // Check if we're on localhost (development)
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://127.0.0.1:3000';
   }
-  // For production, use the same protocol and hostname as the current site
+  
+  // Check if we're on Vercel (production frontend)
+  if (window.location.hostname.includes('vercel.app')) {
+    // Replace with your Railway backend URL
+    return 'https://YOUR_RAILWAY_APP_URL.railway.app';
+  }
+  
+  // Fallback for other production environments
   return `${window.location.protocol}//${window.location.hostname}:3000`;
 };
 
