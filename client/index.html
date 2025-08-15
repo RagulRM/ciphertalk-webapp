@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Platform</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1 id="pageTitle">Welcome to the Chat Platform</h1>
+
+    <img id="titleImage" src="resources/image.jpg" alt="Chat Platform Image" />
+    <!-- Buttons for Register and Login -->
+    <div class="button-container">
+        <button id="registerButton" class="button">Register</button>
+        <button id="loginButton" class="button">Login</button>
+    </div>
+
+    <!-- Registration Form (Initially hidden) -->
+    <form id="registerForm" class="form-container" style="display: none;">
+        <input type="text" id="registerUsername" placeholder="Username" required class="input-field" />
+        <input type="password" id="registerPassword" placeholder="Password" required class="input-field" autocomplete="new-password">
+        <input type="password" id="registerPasskey" placeholder="Passkey" required class="input-field" autocomplete="new-password">
+        <button type="submit" class="button">Register</button>
+        <button id="goBackRegister" class="button go-back-button">Go back</button>
+    </form>
+
+    <!-- Login Form (Initially hidden) -->
+    <form id="loginForm" class="form-container" style="display: none;">
+        <input type="text" id="loginUsername" placeholder="Username" required class="input-field" />
+        <input type="password" id="loginPassword" placeholder="Password" required class="input-field" autocomplete="current-password">
+        <button type="submit" class="button">Login</button>
+        <button id="goBackLogin" class="button go-back-button">Go back</button>
+    </form>
+
+    <!-- Warning Modal -->
+    <div id="warningModal" class="modal">
+        <div class="modal-content">
+            <p>Remember your passkey for decrypting the message.</p>
+            <div class="modal-buttons">
+                <button id="changeButton" class="modal-button">Change</button>
+                <button id="okayButton" class="modal-button">Okay</button>
+            </div>
+        </div>
+    </div>
+    <!-- Success Modal -->
+    <div id="successModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <p>You have successfully registered</p>
+            <button id="continueLoginButton" class="button">Continue to Login</button>
+        </div>
+    </div>
+    <!-- Profile Picture Upload Page -->
+    <div id="profilePicturePage" style="display: none;">
+        <h1>Upload Profile Picture</h1>
+        <p>Select a profile picture to proceed, or skip this step.</p>
+        
+        <input type="file" id="profilePictureInput" accept="image/*" />
+        
+        <div class="button-container">
+            <button id="skipButton" class="button">Skip</button>
+            <button id="continueButton" class="button">Continue</button>
+        </div>
+        <button id="goBackProfileButton" class="button go-back-button">Go back</button>
+    </div>
+    <!-- Profile Picture Warning Modal -->
+    <div id="profilePicWarningModal" class="modal">
+        <div class="modal-content">
+            <p>Please select a profile picture or skip this step.</p>
+            <button id="profilePicOkayButton">Okay</button>
+        </div>
+    </div>
+
+    <!-- Include the JavaScript file -->
+    <script src="script.js"></script>
+</body>
+</html>

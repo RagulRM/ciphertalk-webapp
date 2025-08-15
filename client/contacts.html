@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CipherTalk - Contacts</title>
+    <link rel="stylesheet" href="contacts.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .message.loading {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        }
+        
+        .error-message, .success-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 5px;
+            z-index: 1000;
+            animation: fadeIn 0.3s, fadeOut 0.3s 4.7s;
+        }
+        
+        .error-message {
+            background-color: #ff5252;
+            color: white;
+        }
+        
+        .success-message {
+            background-color: #4caf50;
+            color: white;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="profile-section">
+                    <!-- Find the user profile picture element and update it: -->
+                    <img id="userProfilePic" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiM2NjY2NjYiLz4KPHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwIDEwQzEyLjIwOTEgMTAgMTQgOC4yMDkxNCAxNCA2QzE0IDMuNzkwODYgMTIuMjA5MSAyIDEwIDJDNy43OTA4NiAyIDYgMy43OTA4NiA2IDZDNiA4LjIwOTE0IDcuNzkwODYgMTAgMTAgMTBaIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMTAgMTJDNi42ODYyOSAxMiA0IDE0LjY4NjMgNCAxOFYyMEgxNlYxOEMxNiAxNC42ODYzIDEzLjMxMzcgMTIgMTAgMTJaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4KPC9zdmc+" alt="Profile Picture" class="profile-pic">                    <span id="currentUsername">Loading...</span>
+                </div>
+                <div class="security-section">
+                    <button id="showPasskeyBtn" class="icon-button" title="View Your Passkey">
+                        <i class="fas fa-key"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="search-bar">
+                <input type="text" placeholder="Search contacts..." id="searchInput">
+            </div>
+            
+            <div id="contactsList" class="contact-list">
+                <!-- Contacts will be loaded here -->
+            </div>
+        </div>
+
+        <div id="chatSection" class="main-content">
+    <div class="chat-header active-chat">
+        <img src="#" alt="Selected User" id="selectedUserPic" class="profile-pic" style="display: none;">
+        <span id="selectedUsername" style="display: none;"></span>
+    </div>
+
+    <div id="chatMessages" class="chat-messages">
+    </div>
+
+    
+    <div class="chat-input-area" style="display: none;">
+        <div class="button-group">
+            <button id="sendBtn">Send</button>
+            <button id="encryptBtn">Encrypt</button>
+            <button id="stegoBtn" title="Hide messages in images (Max: 20MB)">
+                <i class="fas fa-image"></i> Steganography
+                <span class="file-size-hint">≤20MB</span>
+            </button>
+        </div>
+    </div>
+</div>
+    </div>
+    
+    <!-- Make sure the file input is properly set up -->
+    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+    <script src="contacts.js"></script>
+</body>
+</html>
