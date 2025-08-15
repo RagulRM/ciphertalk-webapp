@@ -118,6 +118,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const username = document.getElementById('loginUsername').value;
         const password = document.getElementById('loginPassword').value;
         
+        console.log('Login attempt:', { username, serverURL: getServerURL() });
+        
         try {
             const response = await fetch(`${getServerURL()}/login`, {
                 method: 'POST',
@@ -127,31 +129,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ username, password })
             });
             
-            const result = await response.json();
+            console.log('Login response:', response.status, response.statusText);
             
-            if (result.success) {
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log('Login result:', result);
+            
+            if (result.success || result.message === 'Login successful') {
                 // Store username in localStorage
                 localStorage.setItem('currentUser', username);
+                console.log('Login successful, redirecting to contacts.html');
                 // Redirect to contacts page
                 window.location.href = 'contacts.html';
             } else {
-                alert('Login failed: ' + result.message);
+                console.error('Login failed:', result);
+                alert('Login failed: ' + (result.message || 'Unknown error'));
             }
         } catch (error) {
             console.error('Login error:', error);
-            alert('Login failed. Please try again.');
+            alert('Login failed: ' + error.message);
         }
     });
 
     // Go back buttons
-    goBackRegister.addEventListener('click', function() {
+    goBackRegister.addEventListener('click', function(e) {
+        e.preventDefault();
         registerForm.style.display = 'none';
         pageTitle.style.display = 'block';
         titleImage.style.display = 'block';
         document.querySelector('.button-container').style.display = 'block';
     });
 
-    goBackLogin.addEventListener('click', function() {
+    goBackLogin.addEventListener('click', function(e) {
+        e.preventDefault();
         loginForm.style.display = 'none';
         pageTitle.style.display = 'block';
         titleImage.style.display = 'block';
