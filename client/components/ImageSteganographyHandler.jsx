@@ -12,7 +12,7 @@ const getServerURL = () => {
   // Check if we're on Vercel (production frontend)
   if (window.location.hostname.includes('vercel.app')) {
     // Replace with your Railway backend URL
-    return 'https://YOUR_RAILWAY_APP_URL.railway.app';
+    return 'https://ciphertalk-app-production.up.railway.app';
   }
   
   // Fallback for other production environments

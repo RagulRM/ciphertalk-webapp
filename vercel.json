@@ -1,34 +1,44 @@
 {
   "version": 2,
   "name": "ciphertalk-frontend",
-  "builds": [
-    {
-      "src": "client/**",
-      "use": "@vercel/static"
-    }
-  ],
+  "functions": {},
   "routes": [
-    {
-      "src": "/client/(.*)",
-      "dest": "/client/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/client/index.html"
-    },
     {
       "src": "/(.*)",
       "dest": "/client/$1"
     }
   ],
-  "functions": {},
   "rewrites": [
     {
       "source": "/",
       "destination": "/client/index.html"
     },
     {
-      "source": "/((?!client).*)",
+      "source": "/contacts.html",
+      "destination": "/client/contacts.html"
+    },
+    {
+      "source": "/contacts.js",
+      "destination": "/client/contacts.js"
+    },
+    {
+      "source": "/script.js",
+      "destination": "/client/script.js"
+    },
+    {
+      "source": "/style.css",
+      "destination": "/client/style.css"
+    },
+    {
+      "source": "/contacts.css",
+      "destination": "/client/contacts.css"
+    },
+    {
+      "source": "/resources/(.*)",
+      "destination": "/client/resources/$1"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/client/$1"
     }
   ]
