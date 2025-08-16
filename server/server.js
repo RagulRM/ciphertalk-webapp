@@ -59,13 +59,14 @@ app.use((req, res, next) => {
 
 // Redirect Railway domain to custom domain
 app.use((req, res, next) => {
-    // Check if the request is coming from Railway domain
+    // Check if the request is coming from Railway or Vercel domain
     const host = req.get('host');
     const userAgent = req.get('user-agent') || '';
     
     // Skip redirect for Railway health checks and internal requests
     if (userAgent.includes('Railway') || 
         userAgent.includes('healthcheck') ||
+        userAgent.includes('Vercel') ||
         req.headers['x-forwarded-for'] === undefined) {
         return next();
     }
@@ -74,10 +75,11 @@ app.use((req, res, next) => {
     const skipPaths = ['/api', '/uploads', '/health'];
     const isSkipPath = skipPaths.some(path => req.originalUrl.startsWith(path));
     
-    if (host && host.includes('railway.app') && !isSkipPath) {
+    // Redirect both Railway and Vercel domains to custom domain
+    if ((host && (host.includes('railway.app') || host.includes('vercel.app'))) && !isSkipPath) {
         // Redirect to ciphertalk.dev for user-facing pages
         const redirectUrl = `https://ciphertalk.dev${req.originalUrl}`;
-        console.log(`Redirecting Railway traffic from ${host} to ${redirectUrl}`);
+        console.log(`Redirecting traffic from ${host} to ${redirectUrl}`);
         return res.redirect(301, redirectUrl);
     }
     next();
