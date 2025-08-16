@@ -5,7 +5,7 @@ const getServerURL = () => {
         return 'http://127.0.0.1:3000';
     }
     
-    // For production, use the current domain
+    // For production, backend and frontend are on the same domain
     return `${window.location.protocol}//${window.location.hostname}`;
 };
 
