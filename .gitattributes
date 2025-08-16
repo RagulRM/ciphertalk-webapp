@@ -1,0 +1,10 @@
+# Git attributes for proper deployment
+* text=auto
+*.js text
+*.json text  
+*.html text
+*.css text
+*.md text
+
+# Ensure no submodule processing
+.gitmodules export-ignore
