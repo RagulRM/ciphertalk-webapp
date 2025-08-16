@@ -3,68 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CipherTalk - Secure Messaging</title>
+    <title>Chat Platform</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* Ensure our styling loads even if CSS fails */
-        body {
-            background-color: black;
-            color: #888888;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        .button {
-            background-color: #333;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 10px;
-            font-size: 16px;
-        }
-        .button:hover {
-            background-color: #555;
-        }
-        .form-container {
-            background-color: #222;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px;
-        }
-        .input-field {
-            background-color: #444;
-            color: white;
-            border: 1px solid #666;
-            padding: 10px;
-            margin: 10px;
-            border-radius: 5px;
-            width: 200px;
-        }
-        #titleImage {
-            max-width: 300px;
-            margin: 20px;
-            border-radius: 10px;
-        }
-    </style>
 </head>
 <body>
-    <h1 id="pageTitle">🔐 CipherTalk - Secure Messaging</h1>
-    <p>End-to-end encrypted messaging with steganography</p>
+    <h1 id="pageTitle">Welcome to the Chat Platform</h1>
 
-    <img id="titleImage" src="resources/image.jpg" alt="CipherTalk" onerror="this.style.display='none'" />
-    
+    <img id="titleImage" src="resources/image.jpg" alt="Chat Platform Image" />
     <!-- Buttons for Register and Login -->
     <div class="button-container">
-        <button id="registerButton" class="button">📝 Register</button>
-        <button id="loginButton" class="button">🔑 Login</button>
+        <button id="registerButton" class="button">Register</button>
+        <button id="loginButton" class="button">Login</button>
     </div>
 
     <!-- Registration Form (Initially hidden) -->
@@ -72,9 +21,9 @@
         <h2>Create Account</h2>
         <input type="text" id="registerUsername" placeholder="Username" required class="input-field" />
         <input type="password" id="registerPassword" placeholder="Password" required class="input-field" autocomplete="new-password">
-        <input type="password" id="registerPasskey" placeholder="Passkey (for encryption)" required class="input-field" autocomplete="new-password">
-        <button type="submit" class="button">✅ Register</button>
-        <button type="button" id="goBackRegister" class="button">⬅️ Go Back</button>
+        <input type="password" id="registerPasskey" placeholder="Passkey" required class="input-field" autocomplete="new-password">
+        <button type="submit" class="button">Register</button>
+        <button type="button" id="goBackRegister" class="button go-back-button">Go back</button>
     </form>
 
     <!-- Login Form (Initially hidden) -->
@@ -82,38 +31,59 @@
         <h2>Login</h2>
         <input type="text" id="loginUsername" placeholder="Username" required class="input-field" />
         <input type="password" id="loginPassword" placeholder="Password" required class="input-field" autocomplete="current-password">
-        <button type="submit" class="button">🚀 Login</button>
-        <button type="button" id="goBackLogin" class="button">⬅️ Go Back</button>
+        <button type="submit" class="button">Login</button>
+        <button type="button" id="goBackLogin" class="button go-back-button">Go back</button>
     </form>
 
-    <!-- Debug Info -->
-    <div id="debugInfo" style="position: fixed; bottom: 10px; left: 10px; font-size: 12px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px;">
-        Server: <span id="serverUrl">Loading...</span><br>
-        Domain: <span id="currentDomain">Loading...</span>
+    <!-- Warning Modal -->
+    <div id="warningModal" class="modal">
+        <div class="modal-content">
+            <p>Remember your passkey for decrypting the message.</p>
+            <div class="modal-buttons">
+                <button id="changeButton" class="modal-button">Change</button>
+                <button id="okayButton" class="modal-button">Okay</button>
+            </div>
+        </div>
+    </div>
+    <!-- Success Modal -->
+    <div id="successModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <p>You have successfully registered</p>
+            <button id="continueLoginButton" class="button">Continue to Login</button>
+        </div>
+    </div>
+    <!-- Profile Picture Upload Page -->
+    <div id="profilePicturePage" style="display: none;">
+        <h1>Upload Profile Picture</h1>
+        <p>Select a profile picture to proceed, or skip this step.</p>
+        
+        <input type="file" id="profilePictureInput" accept="image/*" />
+        
+        <div class="button-container">
+            <button id="skipButton" class="button">Skip</button>
+            <button id="continueButton" class="button">Continue</button>
+        </div>
+        <button id="goBackProfileButton" class="button go-back-button">Go back</button>
+    </div>
+    <!-- Profile Picture Warning Modal -->
+    <div id="profilePicWarningModal" class="modal">
+        <div class="modal-content">
+            <p>Please select a profile picture or skip this step.</p>
+            <button id="profilePicOkayButton">Okay</button>
+        </div>
+    </div>
+
+    <!-- Popup/Modal for notifications -->
+    <div id="popupOverlay" class="popup-overlay">
+        <div class="popup-container">
+            <div id="popupIcon" class="popup-icon"></div>
+            <div id="popupTitle" class="popup-title"></div>
+            <div id="popupMessage" class="popup-message"></div>
+            <button id="popupButton" class="popup-button">OK</button>
+        </div>
     </div>
 
     <!-- Include the JavaScript file -->
     <script src="script.js"></script>
-    <script>
-        // Debug info
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('currentDomain').textContent = window.location.hostname;
-            
-            // Show server URL being used
-            const getServerURL = () => {
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    return 'http://127.0.0.1:3000';
-                }
-                if (window.location.hostname.includes('vercel.app') || window.location.hostname === 'ciphertalk.dev') {
-                    return 'https://ciphertalk-app-production.up.railway.app';
-                }
-                return window.location.protocol === 'https:' 
-                    ? `https://${window.location.host}` 
-                    : `http://${window.location.host}`;
-            };
-            
-            document.getElementById('serverUrl').textContent = getServerURL();
-        });
-    </script>
 </body>
 </html>

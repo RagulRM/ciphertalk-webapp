@@ -39,3 +39,7 @@ build/
 # Temporary files
 tmp/
 temp/
+
+# Uploaded files (except sample images)
+server/uploads/stego/
+!server/uploads/stego/.gitkeep

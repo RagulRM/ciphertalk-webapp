@@ -362,42 +362,57 @@ function addDecryptButton(messageDiv, message) {
             stegoContainer.appendChild(img);
         }
         
-        const decryptBtn = document.createElement('button');
-        decryptBtn.className = 'stego-decrypt-button';
-        decryptBtn.innerHTML = '🔍 Extract Hidden Message';
-        decryptBtn.style.cssText = `
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: bold;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-            opacity: 0;
-        `;
+        // Only show decrypt button for receivers or senders without originalText
+        const shouldShowDecryptButton = message.receiver === currentUser || 
+                                      (message.sender === currentUser && !message.originalText);
         
-        // Show button on hover
-        stegoContainer.addEventListener('mouseenter', () => {
-            decryptBtn.style.opacity = '1';
-        });
+        if (shouldShowDecryptButton) {
+            const decryptBtn = document.createElement('button');
+            decryptBtn.className = 'stego-decrypt-button';
+            decryptBtn.innerHTML = '🔍 Extract Hidden Message';
+            decryptBtn.style.cssText = `
+                position: absolute;
+                bottom: 10px;
+                right: 10px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: bold;
+                backdrop-filter: blur(10px);
+                transition: all 0.3s ease;
+                opacity: 0;
+            `;
+            
+            // Show button on hover
+            stegoContainer.addEventListener('mouseenter', () => {
+                decryptBtn.style.opacity = '1';
+            });
+            
+            stegoContainer.addEventListener('mouseleave', () => {
+                decryptBtn.style.opacity = '0.7';
+            });
+            
+            decryptBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                debugLog('Steganography decrypt button clicked', message);
+                
+                // If the current user is the sender and has originalText, show it directly
+                if (message.sender === currentUser && message.originalText) {
+                    debugLog('Sender viewing own steganography message', message);
+                    showDecryptedMessage(message.originalText, false, 'Your Original Hidden Message');
+                } else {
+                    // Only prompt for passkey if user is the receiver
+                    decryptMessage(message);
+                }
+            });
+            
+            stegoContainer.appendChild(decryptBtn);
+        }
         
-        stegoContainer.addEventListener('mouseleave', () => {
-            decryptBtn.style.opacity = '0.7';
-        });
-        
-        decryptBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            debugLog('Steganography decrypt button clicked', message);
-            decryptMessage(message);
-        });
-        
-        stegoContainer.appendChild(decryptBtn);
         messageDiv.appendChild(stegoContainer);
         
     } else {
@@ -417,17 +432,30 @@ function addDecryptButton(messageDiv, message) {
 
     // Add click handler for the message itself to trigger decryption
     messageDiv.addEventListener('click', (e) => {
-        // Only trigger decryption if receiver is viewing the message
-        if (message.receiver === currentUser) {
-            e.stopPropagation();
-            debugLog('Message clicked for decryption', message);
-            decryptMessage(message);
-        } else {
-            // For senders, show the original message if available
-            if (message.originalText && message.sender === currentUser) {
+        // For steganography messages, handle sender/receiver logic
+        if (message.type === 'stego') {
+            if (message.sender === currentUser && message.originalText) {
                 e.stopPropagation();
-                debugLog('Sender viewing own message', message);
-                showDecryptedMessage(message.originalText, false, 'Your Original Message');
+                debugLog('Sender viewing own steganography message', message);
+                showDecryptedMessage(message.originalText, false, 'Your Original Hidden Message');
+            } else if (message.receiver === currentUser) {
+                e.stopPropagation();
+                debugLog('Steganography message clicked for decryption', message);
+                decryptMessage(message);
+            }
+        } else {
+            // For regular encrypted messages
+            if (message.receiver === currentUser) {
+                e.stopPropagation();
+                debugLog('Message clicked for decryption', message);
+                decryptMessage(message);
+            } else {
+                // For senders, show the original message if available
+                if (message.originalText && message.sender === currentUser) {
+                    e.stopPropagation();
+                    debugLog('Sender viewing own message', message);
+                    showDecryptedMessage(message.originalText, false, 'Your Original Message');
+                }
             }
         }
         
@@ -1582,7 +1610,8 @@ function setupEventListeners() {
         stegoBtn: ['click', steganographyMessage],
         searchInput: ['input', handleSearch],
         messageInput: ['keydown', handleMessageInputKeydown],
-        showPasskeyBtn: ['click', showUserPasskey]
+        showPasskeyBtn: ['click', showUserPasskey],
+        logoutBtn: ['click', handleLogout]
     };
 
     Object.entries(elements).forEach(([id, [event, handler]]) => {
@@ -1634,6 +1663,17 @@ function handleMessageInputKeydown(event) {
         messageInput.selectionStart = messageInput.selectionEnd = start + 1;
         event.preventDefault();
     }
+}
+
+// Function to handle user logout
+function handleLogout() {
+    debugLog('Logout button clicked');
+    
+    // Clear localStorage
+    localStorage.removeItem('username');
+    
+    // Redirect to login page
+    window.location.href = '/index.html';
 }
 
 // Function to show user's passkey after password verification

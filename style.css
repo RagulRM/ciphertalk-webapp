@@ -42,14 +42,18 @@ body {
 h1 {
     font-size: 2em;
     margin-bottom: 20px;
+    color: #ffffff;
 }
 
 .button-container {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    gap: 15px;
     margin-bottom: 20px;
-    
+    width: 100%;
+    max-width: 300px;
 }
+
 .logo {
     width: 200px;
     height: 200px;
@@ -57,21 +61,42 @@ h1 {
     margin-bottom: 30px;
     opacity: 0.5;
 }
+
 .form-container {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 15px;
     margin-bottom: 20px;
+    background-color: #222222;
+    padding: 25px;
+    border-radius: 10px;
+    border: 1px solid #444444;
+    width: 100%;
+    max-width: 350px;
+    box-sizing: border-box;
+}
+
+.form-container h2 {
+    color: #ffffff;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 1.5em;
 }
 
 .input-field {
     padding: 10px;
     font-size: 1em;
     border-radius: 5px;
-    border: none;
+    border: 1px solid #666666;
     background-color: #333333;
     color: white;
     outline: none;
+    font-family: Arial, sans-serif;
+}
+
+.input-field:focus {
+    border-color: #999999;
+    background-color: #444444;
 }
 
 .input-field::placeholder {
@@ -79,30 +104,33 @@ h1 {
 }
 
 #titleImage {
-    width: 200px; /* Adjust the size as needed */
+    width: 200px;
     height: auto;
-    margin: 20px 0; /* Adds space between title and buttons */
+    margin: 20px 0;
+    border-radius: 10px;
 }
 /* Modal Styles */
 .modal {
-    display: none; /* Hidden by default */
-    position: fixed; /* Stay in place */
-    z-index: 1; /* Sit on top */
+    display: none;
+    position: fixed;
+    z-index: 1;
     left: 0;
     top: 0;
-    width: 100%; /* Full width */
-    height: 100%; /* Full height */
-    background-color: rgba(0, 0, 0, 0.4); /* Black background with opacity */
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
 }
 
 .modal-content {
-    background-color: white;
+    background-color: #222222;
     margin: 15% auto;
     padding: 20px;
     border: 1px solid #888;
+    border-radius: 10px;
     width: 80%;
     max-width: 400px;
     text-align: center;
+    color: #ffffff;
 }
 
 .modal-buttons {
@@ -112,31 +140,165 @@ h1 {
 }
 
 .modal-button {
+    background-color: #333333;
+    color: white;
+    border: none;
     padding: 10px 20px;
+    border-radius: 5px;
     cursor: pointer;
+    transition: background-color 0.3s;
 }
 
+.modal-button:hover {
+    background-color: #555555;
+}
 
 .button {
     background-color: #333333;
     color: #ffffff;
     border: none;
-    padding: 7px 80px;
+    padding: 15px 30px;
     font-size: 1em;
     cursor: pointer;
     border-radius: 5px;
+    font-family: Arial, sans-serif;
+    transition: background-color 0.3s;
 }
-.button:active {
-    transform: scale(0.93);    /* Slightly shrink on click */
-}
+
 .button:hover {
     background-color: #5e5e5e;
 }
 
+.button:active {
+    transform: scale(0.95);
+}
+
 .go-back-button {
-    background-color: #ff0000;
+    background-color: #cc0000;
+    margin-top: 16px;
 }
 
 .go-back-button:hover {
     background-color: #ff4444;
+}
+
+/* Popup/Modal Styles */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.popup-container {
+    background-color: #222222;
+    border: 1px solid #444444;
+    border-radius: 10px;
+    padding: 25px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.popup-icon {
+    font-size: 3em;
+    margin-bottom: 15px;
+}
+
+.popup-icon.success {
+    color: #4CAF50;
+}
+
+.popup-icon.error {
+    color: #f44336;
+}
+
+.popup-icon.warning {
+    color: #ff9800;
+}
+
+.popup-title {
+    color: #ffffff;
+    font-size: 1.3em;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.popup-message {
+    color: #cccccc;
+    margin-bottom: 20px;
+    line-height: 1.4;
+}
+
+.popup-button {
+    background-color: #666666;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s;
+}
+
+.popup-button:hover {
+    background-color: #888888;
+}
+
+.popup-button.success {
+    background-color: #4CAF50;
+}
+
+.popup-button.success:hover {
+    background-color: #66BB6A;
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+    body {
+        padding: 20px;
+        height: auto;
+        min-height: 100vh;
+    }
+    
+    .form-container {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 15px;
+    }
+    
+    .button-container {
+        flex-direction: column;
+        width: 100%;
+        gap: 15px;
+    }
+    
+    .button {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .input-field {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .logo {
+        width: 150px;
+        height: 150px;
+        margin-bottom: 20px;
+    }
+    
+    h1 {
+        font-size: 1.8em;
+        margin-bottom: 15px;
+    }
 }

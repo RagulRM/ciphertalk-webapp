@@ -861,7 +861,7 @@ app.use('/uploads/stego', express.static(path.join(__dirname, 'uploads', 'stego'
     }
 }));
 
-app.use(express.static(path.join(__dirname, '..', 'client')));
+app.use(express.static(path.join(__dirname, '..')));
 
 // Profile Picture Upload Route
 app.post('/uploadProfilePicture', upload.single('profilePicture'), (req, res) => {
@@ -897,7 +897,7 @@ app.post('/check-username', async (req, res) => {
         console.log('Database query result:', existingUser ? 'User exists' : 'Username available');
         
         return res.status(200).json({
-            success: !existingUser,
+            exists: !!existingUser,
             message: existingUser ? 'Username already exists.' : 'Username is available.'
         });
     } catch (err) {
@@ -1101,7 +1101,7 @@ app.get('/test', (req, res) => {
 // Fallback route
 app.get('*', (req, res) => {
     console.log('Fallback route triggered, serving index.html');
-    res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
 // Endpoint to verify password and return the passkey

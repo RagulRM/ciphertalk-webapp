@@ -17,6 +17,74 @@ const getServerURL = () => {
         : `http://${window.location.host}`;
 };
 
+// Popup system functions
+function showPopup(type, title, message, buttonText = 'OK', callback = null) {
+    const overlay = document.getElementById('popupOverlay');
+    const icon = document.getElementById('popupIcon');
+    const titleEl = document.getElementById('popupTitle');
+    const messageEl = document.getElementById('popupMessage');
+    const button = document.getElementById('popupButton');
+    
+    // Set icon based on type
+    switch(type) {
+        case 'success':
+            icon.innerHTML = '✓';
+            icon.className = 'popup-icon success';
+            button.className = 'popup-button success';
+            break;
+        case 'error':
+            icon.innerHTML = '✕';
+            icon.className = 'popup-icon error';
+            button.className = 'popup-button';
+            break;
+        case 'warning':
+            icon.innerHTML = '⚠';
+            icon.className = 'popup-icon warning';
+            button.className = 'popup-button';
+            break;
+        default:
+            icon.innerHTML = 'ℹ';
+            icon.className = 'popup-icon';
+            button.className = 'popup-button';
+    }
+    
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    button.textContent = buttonText;
+    
+    // Show popup
+    overlay.style.display = 'flex';
+    
+    // Handle button click
+    const handleClick = () => {
+        overlay.style.display = 'none';
+        button.removeEventListener('click', handleClick);
+        if (callback) callback();
+    };
+    
+    button.addEventListener('click', handleClick);
+    
+    // Handle overlay click to close
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            overlay.style.display = 'none';
+            if (callback) callback();
+        }
+    });
+}
+
+function showSuccessPopup(title, message, callback = null) {
+    showPopup('success', title, message, 'OK', callback);
+}
+
+function showErrorPopup(title, message, callback = null) {
+    showPopup('error', title, message, 'OK', callback);
+}
+
+function showWarningPopup(title, message, callback = null) {
+    showPopup('warning', title, message, 'OK', callback);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Get elements
     const pageTitle = document.getElementById('pageTitle');
@@ -79,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const checkResult = await checkResponse.json();
             
             if (checkResult.exists) {
-                alert('Username already exists. Please choose a different username.');
+                showWarningPopup('Username Taken', 'Username already exists. Please choose a different username.');
                 return;
             }
             
@@ -95,19 +163,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const registerResult = await registerResponse.json();
             
             if (registerResult.success) {
-                alert('Registration successful! You can now login.');
-                // Reset form and go back to main screen
-                registerForm.reset();
-                registerForm.style.display = 'none';
-                pageTitle.style.display = 'block';
-                titleImage.style.display = 'block';
-                document.querySelector('.button-container').style.display = 'block';
+                showSuccessPopup('Registration Successful!', 'Your account has been created successfully. You can now login.', () => {
+                    // Reset form and go back to main screen
+                    registerForm.reset();
+                    registerForm.style.display = 'none';
+                    pageTitle.style.display = 'block';
+                    titleImage.style.display = 'block';
+                    document.querySelector('.button-container').style.display = 'block';
+                });
             } else {
-                alert('Registration failed: ' + registerResult.message);
+                showErrorPopup('Registration Failed', registerResult.message || 'Please try again.');
             }
         } catch (error) {
             console.error('Registration error:', error);
-            alert('Registration failed. Please try again.');
+            showErrorPopup('Registration Error', 'Registration failed. Please check your connection and try again.');
         }
     });
 
@@ -140,17 +209,17 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success || result.message === 'Login successful') {
                 // Store username in localStorage
-                localStorage.setItem('currentUser', username);
+                localStorage.setItem('username', username);
                 console.log('Login successful, redirecting to contacts.html');
                 // Redirect to contacts page
                 window.location.href = 'contacts.html';
             } else {
                 console.error('Login failed:', result);
-                alert('Login failed: ' + (result.message || 'Unknown error'));
+                showErrorPopup('Login Failed', result.message === 'Invalid credentials' ? 'Invalid username or password. Please try again.' : (result.message || 'Unknown error occurred.'));
             }
         } catch (error) {
             console.error('Login error:', error);
-            alert('Login failed: ' + error.message);
+            showErrorPopup('Login Error', 'Unable to connect to server. Please check your connection and try again.');
         }
     });
 
