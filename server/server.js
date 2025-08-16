@@ -1046,6 +1046,7 @@ app.post('/login', async (req, res) => {
     if (!req.body.username || !req.body.password) {
         console.log('Missing username or password');
         return res.status(400).json({ 
+            success: false,
             message: 'Username and password are required' 
         });
     }
@@ -1058,7 +1059,10 @@ app.post('/login', async (req, res) => {
         
         if (!user) {
             console.log('User not found in database:', username);
-            return res.status(400).json({ message: 'Invalid credentials' });
+            return res.status(400).json({ 
+                success: false,
+                message: 'Invalid credentials' 
+            });
         }
 
         console.log('User found, comparing passwords');
@@ -1066,17 +1070,22 @@ app.post('/login', async (req, res) => {
         
         if (!isMatch) {
             console.log('Password does not match');
-            return res.status(400).json({ message: 'Invalid credentials' });
+            return res.status(400).json({ 
+                success: false,
+                message: 'Invalid credentials' 
+            });
         }
 
         console.log('Login successful for user:', username);
         return res.status(200).json({ 
+            success: true,
             message: 'Login successful',
             username: user.username
         });
     } catch (err) {
         console.error('Error during login:', err);
         return res.status(500).json({ 
+            success: false,
             message: 'Server error',
             error: err.message 
         });
