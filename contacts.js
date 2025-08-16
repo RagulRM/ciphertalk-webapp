@@ -5,13 +5,13 @@ const SERVER_URL = (() => {
         return 'http://127.0.0.1:3000';
     }
     
-    // Check if we're on Vercel deployment
-    if (window.location.hostname.includes('vercel.app')) {
+    // Check if we're on any Vercel or production deployment
+    if (window.location.hostname.includes('vercel.app') || window.location.hostname === 'ciphertalk.dev') {
         return `${window.location.protocol}//${window.location.hostname}`;
     }
     
     // Check if we're on Railway deployment
-    if (window.location.hostname.includes('railway.app') || window.location.hostname === 'ciphertalk.dev') {
+    if (window.location.hostname.includes('railway.app')) {
         return 'https://ciphertalk-app-production.up.railway.app';
     }
     

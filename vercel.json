@@ -14,5 +14,13 @@
   ],
   "env": {
     "NODE_ENV": "production"
+  },
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  },
+  "github": {
+    "silent": true
   }
 }
