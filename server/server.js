@@ -11,6 +11,7 @@ const NodeRSA = require('node-rsa');
 require('dotenv').config();
 
 // CipherTalk Server - Latest Version Sync
+// Deployment Timestamp: 2025-08-17 - Force Latest Code Sync
 const app = express();
 
 // Middleware
