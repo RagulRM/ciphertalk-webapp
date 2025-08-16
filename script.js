@@ -5,9 +5,13 @@ const getServerURL = () => {
         return 'http://127.0.0.1:3000';
     }
     
-    // Check if we're on production (Vercel or custom domain)
-    if (window.location.hostname.includes('vercel.app') || window.location.hostname === 'ciphertalk.dev') {
-        // Railway backend URL
+    // Check if we're on Vercel deployment
+    if (window.location.hostname.includes('vercel.app')) {
+        return `${window.location.protocol}//${window.location.hostname}`;
+    }
+    
+    // Check if we're on Railway deployment  
+    if (window.location.hostname.includes('railway.app') || window.location.hostname === 'ciphertalk.dev') {
         return 'https://ciphertalk-app-production.up.railway.app';
     }
     
