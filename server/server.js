@@ -57,6 +57,19 @@ app.use((req, res, next) => {
     next();
 });
 
+// Redirect Railway domain to custom domain
+app.use((req, res, next) => {
+    // Check if the request is coming from Railway domain
+    const host = req.get('host');
+    if (host && host.includes('railway.app')) {
+        // Redirect to ciphertalk.dev
+        const redirectUrl = `https://ciphertalk.dev${req.originalUrl}`;
+        console.log(`Redirecting Railway traffic from ${host} to ${redirectUrl}`);
+        return res.redirect(301, redirectUrl);
+    }
+    next();
+});
+
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
