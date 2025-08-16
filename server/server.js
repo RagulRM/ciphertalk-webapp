@@ -61,13 +61,45 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
     // Check if the request is coming from Railway domain
     const host = req.get('host');
-    if (host && host.includes('railway.app')) {
-        // Redirect to ciphertalk.dev
+    const userAgent = req.get('user-agent') || '';
+    
+    // Skip redirect for Railway health checks and internal requests
+    if (userAgent.includes('Railway') || 
+        userAgent.includes('healthcheck') ||
+        req.headers['x-forwarded-for'] === undefined) {
+        return next();
+    }
+    
+    // Skip redirect for API endpoints and assets
+    const skipPaths = ['/api', '/uploads', '/health'];
+    const isSkipPath = skipPaths.some(path => req.originalUrl.startsWith(path));
+    
+    if (host && host.includes('railway.app') && !isSkipPath) {
+        // Redirect to ciphertalk.dev for user-facing pages
         const redirectUrl = `https://ciphertalk.dev${req.originalUrl}`;
         console.log(`Redirecting Railway traffic from ${host} to ${redirectUrl}`);
         return res.redirect(301, redirectUrl);
     }
     next();
+});
+
+// Health check endpoint for Railway
+app.get('/', (req, res) => {
+    const host = req.get('host');
+    const userAgent = req.get('user-agent') || '';
+    
+    // For Railway health checks, return a simple OK status
+    if (host && host.includes('railway.app')) {
+        return res.status(200).json({ 
+            status: 'OK', 
+            service: 'CipherTalk',
+            timestamp: new Date().toISOString(),
+            host: host
+        });
+    }
+    
+    // For other requests to root, serve the main page
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
 // Ensure uploads directory exists
