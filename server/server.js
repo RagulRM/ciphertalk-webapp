@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const NodeRSA = require('node-rsa');
 require('dotenv').config();
 
+// CipherTalk Server - Latest Version Sync
 const app = express();
 
 // Middleware
