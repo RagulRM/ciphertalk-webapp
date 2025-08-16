@@ -12,33 +12,7 @@
       "dest": "server/server.js"
     }
   ],
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "(?!ciphertalk\\.dev).*\\.vercel\\.app"
-        }
-      ],
-      "destination": "https://ciphertalk.dev/$1",
-      "permanent": true
-    }
-  ],
   "env": {
     "NODE_ENV": "production"
-  },
-  "git": {
-    "deploymentEnabled": {
-      "main": true
-    }
-  },
-  "github": {
-    "silent": true
-  },
-  "functions": {
-    "server/server.js": {
-      "maxDuration": 10
-    }
   }
 }

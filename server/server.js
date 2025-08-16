@@ -58,53 +58,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Redirect Railway domain to custom domain
-app.use((req, res, next) => {
-    // Check if the request is coming from Railway or Vercel domain
-    const host = req.get('host');
-    const userAgent = req.get('user-agent') || '';
-    
-    // Skip redirect for Railway health checks and internal requests
-    if (userAgent.includes('Railway') || 
-        userAgent.includes('healthcheck') ||
-        userAgent.includes('Vercel') ||
-        req.headers['x-forwarded-for'] === undefined) {
-        return next();
-    }
-    
-    // Skip redirect for API endpoints and assets
-    const skipPaths = ['/api', '/uploads', '/health'];
-    const isSkipPath = skipPaths.some(path => req.originalUrl.startsWith(path));
-    
-    // Redirect both Railway and Vercel domains to custom domain
-    if ((host && (host.includes('railway.app') || host.includes('vercel.app'))) && !isSkipPath) {
-        // Redirect to ciphertalk.dev for user-facing pages
-        const redirectUrl = `https://ciphertalk.dev${req.originalUrl}`;
-        console.log(`Redirecting traffic from ${host} to ${redirectUrl}`);
-        return res.redirect(301, redirectUrl);
-    }
-    next();
-});
-
-// Health check endpoint for Railway
-app.get('/', (req, res) => {
-    const host = req.get('host');
-    const userAgent = req.get('user-agent') || '';
-    
-    // For Railway health checks, return a simple OK status
-    if (host && host.includes('railway.app')) {
-        return res.status(200).json({ 
-            status: 'OK', 
-            service: 'CipherTalk',
-            timestamp: new Date().toISOString(),
-            host: host
-        });
-    }
-    
-    // For other requests to root, serve the main page
-    res.sendFile(path.join(__dirname, '..', 'index.html'));
-});
-
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {

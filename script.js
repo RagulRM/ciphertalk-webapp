@@ -5,25 +5,8 @@ const getServerURL = () => {
         return 'http://127.0.0.1:3000';
     }
     
-    // Check if we're on ciphertalk.dev (custom domain - use Vercel)
-    if (window.location.hostname === 'ciphertalk.dev') {
-        return `${window.location.protocol}//${window.location.hostname}`;
-    }
-    
-    // Check if we're on Vercel deployment
-    if (window.location.hostname.includes('vercel.app')) {
-        return `${window.location.protocol}//${window.location.hostname}`;
-    }
-    
-    // Check if we're on Railway deployment  
-    if (window.location.hostname.includes('railway.app')) {
-        return `${window.location.protocol}//${window.location.hostname}`;
-    }
-    
-    // Fallback for other production environments
-    return window.location.protocol === 'https:' 
-        ? `https://${window.location.host}` 
-        : `http://${window.location.host}`;
+    // For production, use the current domain
+    return `${window.location.protocol}//${window.location.hostname}`;
 };
 
 // Popup system functions
