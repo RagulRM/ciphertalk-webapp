@@ -35,5 +35,10 @@
   },
   "github": {
     "silent": true
+  },
+  "functions": {
+    "server/server.js": {
+      "maxDuration": 10
+    }
   }
 }
