@@ -66,6 +66,15 @@ if (!fs.existsSync(uploadDir)) {
     console.log('Created uploads directory at:', uploadDir);
 }
 
+// Ensure resources directory exists (for static files)
+const resourcesDir = path.join(__dirname, '..', 'resources');
+console.log('Resources directory path:', resourcesDir);
+if (!fs.existsSync(resourcesDir)) {
+    console.error('WARNING: Resources directory not found at:', resourcesDir);
+    fs.mkdirSync(resourcesDir, { recursive: true });
+    console.log('Created resources directory at:', resourcesDir);
+}
+
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
@@ -863,6 +872,16 @@ app.use('/uploads/stego', express.static(path.join(__dirname, 'uploads', 'stego'
     }
 }));
 
+// Debug resources access
+app.use('/resources', (req, res, next) => {
+    console.log('Resource requested:', req.url);
+    next();
+});
+
+// Explicitly serve resources directory
+app.use('/resources', express.static(path.join(__dirname, '..', 'resources')));
+
+// Serve static files from the root directory
 app.use(express.static(path.join(__dirname, '..')));
 
 // Profile Picture Upload Route
@@ -1098,6 +1117,12 @@ app.post('/login', async (req, res) => {
 app.get('/test', (req, res) => {
     console.log('GET /test route triggered');
     res.json({ message: 'Server is reachable' });
+});
+
+// Add a debug route
+app.get('/debug', (req, res) => {
+    console.log('GET /debug route triggered');
+    res.sendFile(path.join(__dirname, '..', 'debug.html'));
 });
 
 // Fallback route
