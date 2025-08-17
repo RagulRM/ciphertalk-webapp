@@ -255,6 +255,120 @@ app.get('/api/test-connection-alt', async (req, res) => {
     }
 });
 
+// Test registration with database debugging
+app.post('/api/register-debug', async (req, res) => {
+    try {
+        await connectToDatabase();
+        
+        const { username, password, passkey } = req.body;
+        
+        if (!username || !password || !passkey) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields required',
+                debug: { username: !!username, password: !!password, passkey: !!passkey }
+            });
+        }
+        
+        console.log(`🔍 Debug Registration - Username: ${username}`);
+        console.log(`🔍 Current Database: ${mongoose.connection.db.databaseName}`);
+        
+        // Check current database for existing user
+        const existingUser = await User.findOne({ username });
+        console.log(`🔍 Existing user found: ${!!existingUser}`);
+        
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'User already exists in current database',
+                debug: {
+                    database: mongoose.connection.db.databaseName,
+                    existingUser: true
+                }
+            });
+        }
+        
+        // Try to create user
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
+        const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
+        
+        const newUser = new User({
+            username,
+            password: hashedPassword,
+            passkey,
+            publicKey,
+            encryptedPrivateKey,
+            profilePicture: 'resources/Default.jpg'
+        });
+        
+        const savedUser = await newUser.save();
+        console.log(`✅ User created with ID: ${savedUser._id}`);
+        
+        res.json({
+            success: true,
+            message: 'User registered successfully',
+            debug: {
+                database: mongoose.connection.db.databaseName,
+                userId: savedUser._id,
+                collections: await mongoose.connection.db.listCollections().toArray()
+            }
+        });
+        
+    } catch (error) {
+        console.error('Registration debug error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Registration failed',
+            error: error.message,
+            debug: {
+                database: mongoose.connection.db?.databaseName,
+                readyState: mongoose.connection.readyState
+            }
+        });
+    }
+});
+
+// Database inspection endpoint
+app.get('/api/db-inspect', async (req, res) => {
+    try {
+        await connectToDatabase();
+        
+        const db = mongoose.connection.db;
+        const admin = db.admin();
+        
+        // List all databases
+        const databases = await admin.listDatabases();
+        
+        // Get current database info
+        const currentDb = db.databaseName;
+        const collections = await db.listCollections().toArray();
+        
+        // Check users collection specifically
+        const usersCollection = db.collection('users');
+        const userCount = await usersCollection.countDocuments();
+        
+        res.json({
+            success: true,
+            currentDatabase: currentDb,
+            allDatabases: databases.databases.map(db => ({
+                name: db.name,
+                sizeOnDisk: db.sizeOnDisk
+            })),
+            collectionsInCurrentDb: collections.map(col => col.name),
+            usersInCurrentDb: userCount,
+            connectionString: process.env.MONGODB_URI.replace(/:[^:@]*@/, ':***@') // Hide password
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: error.stack
+        });
+    }
+});
+
 // Environment debug endpoint
 app.get('/api/env-debug', (req, res) => {
     const envInfo = {
