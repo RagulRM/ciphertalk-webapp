@@ -69,6 +69,24 @@ mongoose.connect(process.env.MONGODB_URI)
         console.error('Failed to connect to MongoDB Database', err);
     });
 
+// Debug endpoint to check MongoDB connection and environment
+app.get('/api/debug', async (req, res) => {
+    try {
+        const mongoUri = process.env.MONGODB_URI ? 'SET' : 'NOT SET';
+        const mongoState = mongoose.connection.readyState;
+        const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+        
+        res.json({
+            mongoUri: mongoUri,
+            mongoState: states[mongoState] || 'unknown',
+            nodeEnv: process.env.NODE_ENV || 'not set',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // User Schema
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
