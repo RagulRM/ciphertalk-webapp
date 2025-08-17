@@ -62,6 +62,17 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', UserSchema);
 
+// Message Schema
+const MessageSchema = new mongoose.Schema({
+    sender: { type: String, required: true },
+    receiver: { type: String, required: true },
+    content: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    encrypted: { type: Boolean, default: false }
+});
+
+const Message = mongoose.model('Message', MessageSchema);
+
 // Encryption Utilities
 class EncryptionUtils {
     static generateRSAKeyPair() {
@@ -308,6 +319,157 @@ app.post('/api/login', async (req, res) => {
             success: false, 
             message: 'Login failed',
             error: error.message 
+        });
+    }
+});
+
+// Contacts endpoint
+app.get('/api/contacts', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const users = await User.find({}, { username: 1, profilePicture: 1, _id: 0 });
+        console.log('Contacts found:', users.length);
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching contacts:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get chat history
+app.get('/api/messages/:user1/:user2', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const { user1, user2 } = req.params;
+        
+        const messages = await Message.find({
+            $or: [
+                { sender: user1, receiver: user2 },
+                { sender: user2, receiver: user1 }
+            ]
+        }).sort({ timestamp: 1 });
+        
+        res.json(messages);
+    } catch (error) {
+        console.error('Error fetching messages:', error);
+        res.status(500).json({ message: 'Server error fetching messages' });
+    }
+});
+
+// Send message
+app.post('/api/messages/send', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const { sender, receiver, content } = req.body;
+        
+        if (!sender || !receiver || !content) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Sender, receiver, and content are required' 
+            });
+        }
+        
+        const message = new Message({
+            sender,
+            receiver,
+            content,
+            timestamp: new Date()
+        });
+        
+        await message.save();
+        console.log('Message saved successfully');
+        
+        res.json({ 
+            success: true, 
+            message: 'Message sent successfully' 
+        });
+    } catch (error) {
+        console.error('Error sending message:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error sending message' 
+        });
+    }
+});
+
+// Get user profile picture
+app.get('/api/user/:username/profile-picture', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const { username } = req.params;
+        
+        const user = await User.findOne({ username }, { profilePicture: 1 });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        res.json({ profilePicture: user.profilePicture });
+    } catch (error) {
+        console.error('Error fetching profile picture:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Send encrypted message
+app.post('/api/messages/send-encrypted', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const { sender, receiver, encryptedContent } = req.body;
+        
+        if (!sender || !receiver || !encryptedContent) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Sender, receiver, and encrypted content are required' 
+            });
+        }
+        
+        const message = new Message({
+            sender,
+            receiver,
+            content: encryptedContent,
+            timestamp: new Date(),
+            encrypted: true
+        });
+        
+        await message.save();
+        console.log('Encrypted message saved successfully');
+        
+        res.json({ 
+            success: true, 
+            message: 'Encrypted message sent successfully' 
+        });
+    } catch (error) {
+        console.error('Error sending encrypted message:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error sending encrypted message' 
+        });
+    }
+});
+
+// Decrypt message
+app.post('/api/messages/decrypt', async (req, res) => {
+    try {
+        const { encryptedContent, passkey } = req.body;
+        
+        if (!encryptedContent || !passkey) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Encrypted content and passkey are required' 
+            });
+        }
+        
+        // Simple decryption for now (in production, implement proper decryption)
+        // For now, just return the content as-is for testing
+        res.json({ 
+            success: true, 
+            decryptedMessage: encryptedContent // Simplified for testing
+        });
+    } catch (error) {
+        console.error('Error decrypting message:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error decrypting message' 
         });
     }
 });
