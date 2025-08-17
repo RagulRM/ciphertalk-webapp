@@ -1,56 +1,39 @@
-// Dynamic server URL based on environment
+// Server URL configuration
 const SERVER_URL = (() => {
-    // Check if we're on localhost (development)
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return 'http://127.0.0.1:3000';
     }
-    
-    // For production, backend and frontend are on the same domain
     return `${window.location.protocol}//${window.location.hostname}`;
 })();
 let currentUser = null;
 let selectedUser = null;
 
-// Debug logging utility
-function debugLog(message, error = null) {
-    console.log(`[DEBUG] ${message}`);
-    if (error) {
-        console.error(error);
-    }
-}
-
 // Response validation helper
 function validateResponse(response, context) {
     if (!response.ok) {
-        debugLog(`Response not OK for ${context}`, response);
         throw new Error(`${context} failed: ${response.status} ${response.statusText}`);
     }
-    debugLog(`Response OK for ${context}`, response);
     return response;
 }
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        debugLog('Starting application initialization');
         const username = localStorage.getItem('username');
         if (!username) {
-            debugLog('No username found in localStorage, redirecting to login');
             window.location.href = '/login.html';
             return;
         }
         
         currentUser = username;
         await initializeApp();
-        debugLog('Initialization complete');
     } catch (error) {
-        debugLog('Error during initialization', error);
         showError('There was an error loading the application. Please refresh the page.');
     }
 });
 
 function initializeApp() {
-    debugLog('Initializing main UI components');
+
     const chatHeader = document.querySelector('.chat-header');
     const chatInputArea = document.querySelector('.chat-input-area');
     const selectedUserPic = document.getElementById('selectedUserPic');
@@ -59,11 +42,11 @@ function initializeApp() {
     // Hide chat input area and profile picture initially
     if (chatInputArea) {
         chatInputArea.style.display = 'none';
-        debugLog('Chat input area hidden');
+
     }
     if (selectedUserPic) {
         selectedUserPic.style.display = 'none';
-        debugLog('Selected user pic hidden');
+
     }
     
     // Add message input
@@ -80,9 +63,9 @@ function initializeApp() {
         loadContacts()
     ]).then(() => {
         setupEventListeners();
-        debugLog('Application ready for user interaction');
+
     }).catch(error => {
-        debugLog('Error in initializeApp Promise.all', error);
+
         showError('An error occurred while loading contacts or user information.');
     });
 }
@@ -94,7 +77,7 @@ function setupContactListClickHandler() {
     if (sidebar) {
         sidebar.addEventListener('click', (event) => {
             if (event.target === sidebar || event.target === contactsList) {
-                debugLog('Clicked outside contact items, resetting chat section');
+
                 resetChatSection();
             }
         });
@@ -108,33 +91,33 @@ async function updateUserDisplay() {
     
     if (usernameElement) {
         usernameElement.textContent = currentUser;
-        debugLog(`Set current user display: ${currentUser}`);
+
     }
     
     if (profilePicElement) {
         try {
             await updateProfilePicture(profilePicElement, currentUser);
         } catch (error) {
-            debugLog('Error updating profile picture', error);
+
         }
     }
 }
 
 async function updateProfilePicture(imgElement, username) {
-    debugLog(`Fetching profile picture for ${username}`);
+
     const response = await fetch(`${SERVER_URL}/api/user/${username}/profile-picture`);
     await validateResponse(response, 'Profile picture fetch');
     
     const data = await response.json();
     if (data.success) {
         imgElement.src = getFullImageUrl(data.profilePicture);
-        debugLog(`Updated user profile pic: ${imgElement.src}`);
+
         imgElement.onerror = () => {
-            debugLog('Profile pic load error, using default');
+
             imgElement.src = 'resources/default-profile-pic.jpg';
         };
     } else {
-        debugLog('Profile picture fetch returned success=false', data);
+
         imgElement.src = 'resources/default-profile-pic.jpg';
     }
 }
@@ -150,16 +133,16 @@ function getFullImageUrl(imagePath) {
 
 // Contacts management
 async function loadContacts() {
-    debugLog('Loading contacts from server...');
+
     const response = await fetch(`${SERVER_URL}/api/contacts`);
     await validateResponse(response, 'Contacts fetch');
     
     const contacts = await response.json();
-    debugLog(`Contacts loaded: ${contacts.length} contacts found`);
+
     
     const contactsList = document.getElementById('contactsList');
     if (!contactsList) {
-        debugLog('No contactsList element found');
+
         return;
     }
     
@@ -180,7 +163,7 @@ function createContactElement(contact) {
     img.alt = `${contact.username}'s profile`;
     img.className = 'profile-pic';
     img.onerror = () => {
-        debugLog(`Profile pic load error for user ${contact.username}, using default`);
+
         img.src = 'resources/default-profile-pic.jpg';
     };
 
@@ -189,7 +172,7 @@ function createContactElement(contact) {
     
     div.append(img, span);
     div.addEventListener('click', () => {
-        debugLog(`Contact selected: ${contact.username}`);
+
         selectContact(contact);
     });
     
@@ -198,7 +181,7 @@ function createContactElement(contact) {
 
 function selectContact(contact) {
     selectedUser = contact;
-    debugLog(`selectedUser set to: ${contact.username}`);
+
     
     const selectedUsername = document.getElementById('selectedUsername');
     const selectedUserPic = document.getElementById('selectedUserPic');
@@ -208,14 +191,14 @@ function selectContact(contact) {
     if (selectedUsername) {
         selectedUsername.textContent = contact.username;
         selectedUsername.style.display = 'block';
-        debugLog(`Displayed selected username: ${contact.username}`);
+
     }
     
     if (selectedUserPic) {
         selectedUserPic.src = getFullImageUrl(contact.profilePicture);
         selectedUserPic.style.display = 'block';
         selectedUserPic.onerror = () => {
-            debugLog(`Profile pic load error in chat for ${contact.username}, using default`);
+
             selectedUserPic.src = 'resources/default-profile-pic.jpg';
         };
     }
@@ -234,7 +217,7 @@ function selectContact(contact) {
 }
 
 function resetChatSection() {
-    debugLog('Resetting chat section');
+
     selectedUser = null;
     const chatHeader = document.querySelector('.chat-header');
     const chatInputArea = document.querySelector('.chat-input-area');
@@ -268,16 +251,16 @@ function resetChatSection() {
 
 // Chat history and message handling
 async function loadChatHistory(contactUsername) {
-    debugLog(`Loading chat history for ${contactUsername}`);
+
     const response = await fetch(`${SERVER_URL}/api/messages/${currentUser}/${contactUsername}`);
     await validateResponse(response, 'Chat history fetch');
     
     const messages = await response.json();
-    debugLog(`Loaded ${messages.length} messages`);
+
 
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) {
-        debugLog('No chatMessages element found');
+
         return;
     }
     
@@ -288,7 +271,7 @@ async function loadChatHistory(contactUsername) {
 function displayMessage(message) {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) {
-        debugLog('Cannot display message, no chatMessages element found', message);
+
         return;
     }
     
@@ -297,12 +280,12 @@ function displayMessage(message) {
 
     switch (message.type) {
         case 'text':
-            debugLog('Displaying text message', message);
+
             messageDiv.textContent = message.content;
             break;
                 
         case 'encrypted':
-            debugLog('Displaying RSA-AES encrypted message', message);
+
             messageDiv.className += ' encrypted-message';
             
             // Create encrypted message display with lock icon and hint
@@ -319,12 +302,12 @@ function displayMessage(message) {
             break;
                 
         case 'stego':
-            debugLog('Displaying stego message', message);
+
             const img = document.createElement('img');
             img.src = getFullImageUrl(message.content);
             img.className = 'stego-image';
             img.onerror = function() {
-                debugLog('Failed to load stego image, using fallback', img.src);
+
                 this.src = 'resources/fallback-image.png';
             };
             messageDiv.appendChild(img);
@@ -332,7 +315,7 @@ function displayMessage(message) {
             break;
             
         default:
-            debugLog(`Unknown message type: ${message.type}`, message);
+
             messageDiv.textContent = message.content;
             break;
     }
@@ -392,11 +375,11 @@ function addDecryptButton(messageDiv, message) {
             
             decryptBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                debugLog('Steganography decrypt button clicked', message);
+
                 
                 // If the current user is the sender and has originalText, show it directly
                 if (message.sender === currentUser && message.originalText) {
-                    debugLog('Sender viewing own steganography message', message);
+
                     showDecryptedMessage(message.originalText, false, 'Your Original Hidden Message');
                 } else {
                     // Only prompt for passkey if user is the receiver
@@ -417,7 +400,7 @@ function addDecryptButton(messageDiv, message) {
 
         decryptBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            debugLog('Decrypt button clicked', message);
+
             decryptMessage(message);
         });
 
@@ -430,24 +413,24 @@ function addDecryptButton(messageDiv, message) {
         if (message.type === 'stego') {
             if (message.sender === currentUser && message.originalText) {
                 e.stopPropagation();
-                debugLog('Sender viewing own steganography message', message);
+
                 showDecryptedMessage(message.originalText, false, 'Your Original Hidden Message');
             } else if (message.receiver === currentUser) {
                 e.stopPropagation();
-                debugLog('Steganography message clicked for decryption', message);
+
                 decryptMessage(message);
             }
         } else {
             // For regular encrypted messages
             if (message.receiver === currentUser) {
                 e.stopPropagation();
-                debugLog('Message clicked for decryption', message);
+
                 decryptMessage(message);
             } else {
                 // For senders, show the original message if available
                 if (message.originalText && message.sender === currentUser) {
                     e.stopPropagation();
-                    debugLog('Sender viewing own message', message);
+
                     showDecryptedMessage(message.originalText, false, 'Your Original Message');
                 }
             }
@@ -467,12 +450,12 @@ async function sendMessage() {
     let content = messageInput.value.trim();
     
     if (!content || !selectedUser) {
-        debugLog('No content or no selectedUser, skipping sendMessage');
+
         return;
     }
     
     content = capitalizeFirstLetter(content);
-    debugLog(`Sending message to ${selectedUser.username}: ${content}`);
+
     
     try {
         const response = await fetch(`${SERVER_URL}/api/messages/send`, {
@@ -488,7 +471,7 @@ async function sendMessage() {
         
         await validateResponse(response, 'Message send');
         const result = await response.json();
-        debugLog(`Message send response received`, result);
+
         
         if (result.success) {
             messageInput.value = '';
@@ -503,7 +486,7 @@ async function sendMessage() {
             throw new Error(result.message || 'Failed to send message');
         }
     } catch (error) {
-        debugLog('Error sending message', error);
+
         showError('Failed to send message. Please try again.');
     }
 }
@@ -518,11 +501,11 @@ async function encryptMessage() {
     const content = messageInput.value.trim();
     
     if (!content || !selectedUser) {
-        debugLog('No content or no selectedUser, skipping encryptMessage');
+
         return;
     }
     
-    debugLog(`Encrypting message for ${selectedUser.username} using RSA-AES hybrid encryption`);
+
     
     try {
         // Use the server's RSA-AES hybrid encryption endpoint
@@ -538,7 +521,7 @@ async function encryptMessage() {
         
         await validateResponse(response, 'RSA-AES encrypted message send');
         const result = await response.json();
-        debugLog(`RSA-AES encrypted message send response received:`, result);
+
         
         if (result.success) {
             messageInput.value = '';
@@ -554,14 +537,14 @@ async function encryptMessage() {
             throw new Error(result.message || 'Failed to send encrypted message');
         }
     } catch (error) {
-        debugLog('Error sending RSA-AES encrypted message', error);
+
         showError('Failed to send encrypted message. Please try again.');
     }
 }
 
 // Update the steganographyMessage function to implement RSA-AES hybrid encryption with LSB steganography
 async function steganographyMessage() {
-    debugLog('Starting RSA-AES steganography process');
+
     
     const messageInput = document.getElementById('messageInput');
     const message = messageInput.value.trim();
@@ -573,7 +556,7 @@ async function steganographyMessage() {
 
     try {
         // Step 1: Show file picker for image selection
-        debugLog('Opening file picker for image selection');
+
         
         // Create a hidden file input for image selection
         const imageInput = document.createElement('input');
@@ -600,7 +583,7 @@ async function steganographyMessage() {
         
         // Wait for file selection
         const file = await filePromise;
-        debugLog(`Selected file: ${file.name} (${file.size} bytes)`);
+
         
         // Add loading indicator to chat
         const loadingDiv = document.createElement('div');
@@ -663,7 +646,7 @@ async function steganographyMessage() {
         formData.append('receiver', selectedUser.username);
         formData.append('bits', '4'); // LSB bit depth
         
-        debugLog('Sending RSA-AES steganography request to server');
+
         
         const stegoResponse = await fetch(`${SERVER_URL}/api/messages/stego/send`, {
             method: 'POST',
@@ -676,7 +659,7 @@ async function steganographyMessage() {
 
         // Parse the steganography response
         const stegoData = await stegoResponse.json();
-        debugLog('RSA-AES steganography response:', stegoData);
+
         
         if (!stegoData.success) {
             throw new Error(stegoData.message || 'Unknown steganography error');
@@ -709,7 +692,7 @@ async function steganographyMessage() {
             loadingIndicator.remove();
         }
         
-        debugLog('Error in RSA-AES steganography process:', error);
+
         showError(`Steganography failed: ${error.message}`);
     }
 }
@@ -1154,7 +1137,7 @@ if (!document.querySelector('#custom-modal-styles')) {
 
 // Encryption/Decryption utilities
 async function promptPasskey() {
-    debugLog('Displaying passkey prompt for RSA private key decryption');
+
     return new Promise((resolve) => {
         const modalHtml = `
             <div class="modal-overlay">
@@ -1185,10 +1168,10 @@ async function promptPasskey() {
         function handleModalAction(action) {
             modalElement.remove();
             if (action === 'confirm') {
-                debugLog('Personal unlock key confirmed by user');
+
                 resolve(input.value);
             } else {
-                debugLog('Passkey prompt cancelled by user');
+
                 resolve(null);
             }
         }
@@ -1444,13 +1427,13 @@ function removeSteganographyDecryptionPopup() {
 }
 
 async function decryptMessage(message) {
-    debugLog('Starting RSA-AES decryption process', message);
+
     
     // For RSA-AES encrypted messages, prompt for the user's passkey
     // This passkey will unlock their private RSA key stored on the server
     const passkey = await promptPasskey();
     if (!passkey) {
-        debugLog('No passkey entered, canceling decryption');
+
         return;
     }
 
@@ -1458,7 +1441,7 @@ async function decryptMessage(message) {
         let decryptedContent;
 
         if (message.type === 'stego') {
-            debugLog('Decrypting RSA-AES steganography message');
+
             
             // Show inline steganography decryption loading in chat
             showInlineSteganographyDecryption();
@@ -1498,7 +1481,7 @@ async function decryptMessage(message) {
             removeInlineSteganographyDecryption();
             
         } else if (message.type === 'encrypted') {
-            debugLog('Decrypting RSA-AES encrypted message via server');
+
             
             // For RSA-AES encrypted messages, use the server's decryption endpoint
             // The server will:
@@ -1532,7 +1515,7 @@ async function decryptMessage(message) {
             throw new Error('Decryption failed - invalid passkey or corrupted message');
         }
 
-        debugLog('Message decrypted successfully');
+
         showDecryptedMessage(decryptedContent);
         
     } catch (error) {
@@ -1541,12 +1524,12 @@ async function decryptMessage(message) {
         removeSteganographyDecryptionPopup();
         removeSteganographyLoadingPopup();
         
-        debugLog('Decryption failed:', error);
+
         showError(`Decryption failed: ${error.message}`);
     }
 }
 function showDecryptedMessage(message, isError = false, title = null) {
-    debugLog(`Showing decrypted message: ${message}, isError=${isError}`);
+
     const modalHtml = `
         <div class="modal-overlay">
             <div class="modal-content decryption-result">
@@ -1575,7 +1558,7 @@ function showDecryptedMessage(message, isError = false, title = null) {
     document.body.appendChild(modalElement);
 
     modalElement.querySelector('.modal-button').addEventListener('click', () => {
-        debugLog('Closing decrypted message modal');
+
         modalElement.remove();
     });
 
@@ -1588,7 +1571,7 @@ function showDecryptedMessage(message, isError = false, title = null) {
 
     document.addEventListener('keydown', function escapeHandler(e) {
         if (e.key === 'Escape') {
-            debugLog('Escape key pressed, closing decrypted message modal');
+
             document.removeEventListener('keydown', escapeHandler);
             modalElement.remove();
         }
@@ -1597,7 +1580,7 @@ function showDecryptedMessage(message, isError = false, title = null) {
 
 // Event listeners setup
 function setupEventListeners() {
-    debugLog('Setting up event listeners for the UI');
+
     const elements = {
         sendBtn: ['click', sendMessage],
         encryptBtn: ['click', encryptMessage],
@@ -1611,10 +1594,10 @@ function setupEventListeners() {
     Object.entries(elements).forEach(([id, [event, handler]]) => {
         const element = document.getElementById(id);
         if (element) {
-            debugLog(`Adding event listener for ${id} on ${event}`);
+
             element.addEventListener(event, handler);
         } else {
-            debugLog(`Element with ID ${id} not found`);
+
         }
     });
 
@@ -1645,11 +1628,11 @@ function handleMessageInput(event) {
 function handleMessageInputKeydown(event) {
     const messageInput = event.target;
     if (event.key === 'Enter' && !event.shiftKey) {
-        debugLog('Enter pressed, sending message');
+
         event.preventDefault();
         sendMessage();
     } else if (event.key === 'Enter' && event.shiftKey) {
-        debugLog('Shift+Enter pressed, adding new line');
+
         const start = messageInput.selectionStart;
         const end = messageInput.selectionEnd;
         const value = messageInput.value;
@@ -1661,7 +1644,7 @@ function handleMessageInputKeydown(event) {
 
 // Function to handle user logout
 function handleLogout() {
-    debugLog('Logout button clicked');
+
     
     // Clear localStorage
     localStorage.removeItem('username');
@@ -1672,11 +1655,11 @@ function handleLogout() {
 
 // Function to show user's passkey after password verification
 async function showUserPasskey() {
-    debugLog('Show passkey button clicked');
+
     
     const password = await promptPassword();
     if (!password) {
-        debugLog('No password entered, canceling passkey view');
+
         return;
     }
 
@@ -1713,14 +1696,14 @@ async function showUserPasskey() {
         
     } catch (error) {
         console.error('Error in showUserPasskey:', error);
-        debugLog('Error verifying password:', error);
+
         showError(`Password verification failed: ${error.message}`);
     }
 }
 
 // Function to prompt for password
 async function promptPassword() {
-    debugLog('Displaying password prompt for passkey viewing');
+
     return new Promise((resolve) => {
         const modalHtml = `
             <div class="modal-overlay">
@@ -1751,10 +1734,10 @@ async function promptPassword() {
         function handleModalAction(action) {
             modalElement.remove();
             if (action === 'confirm') {
-                debugLog('Password entered by user');
+
                 resolve(input.value);
             } else {
-                debugLog('Password prompt cancelled by user');
+
                 resolve(null);
             }
         }
@@ -1783,7 +1766,7 @@ async function promptPassword() {
 // Function to display the passkey
 function displayPasskey(passkey) {
     console.log('displayPasskey called with:', passkey);
-    debugLog('Displaying user passkey:', passkey);
+
     
     // Remove any existing passkey modal first
     const existingModal = document.querySelector('.modal-overlay');
@@ -1865,7 +1848,7 @@ function displayPasskey(passkey) {
     if (closeButton) {
         closeButton.addEventListener('click', () => {
             console.log('Close button clicked');
-            debugLog('Closing passkey display modal');
+
             modalElement.remove();
         });
     }
@@ -1882,7 +1865,7 @@ function displayPasskey(passkey) {
     const escapeHandler = (e) => {
         if (e.key === 'Escape') {
             console.log('Escape key pressed');
-            debugLog('Escape key pressed, closing passkey display modal');
+
             document.removeEventListener('keydown', escapeHandler);
             modalElement.remove();
         }
@@ -1896,7 +1879,7 @@ function displayPasskey(passkey) {
 // Search functionality
 function handleSearch(event) {
     const searchTerm = event.target.value.toLowerCase();
-    debugLog(`Handling search, term = "${searchTerm}"`);
+
     const contactItems = document.querySelectorAll('.contact-item');
     
     contactItems.forEach(item => {
@@ -1907,7 +1890,7 @@ function handleSearch(event) {
 
 // Error and success messages
 function showError(message) {
-    debugLog(`Error: ${message}`);
+
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error-message';
     errorDiv.textContent = message;
@@ -1916,7 +1899,7 @@ function showError(message) {
 }
 
 function showMessage(message) {
-    debugLog(`Showing message: ${message}`);
+
     const messageDiv = document.createElement('div');
     messageDiv.className = 'success-message';
     messageDiv.textContent = message;

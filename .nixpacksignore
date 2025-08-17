@@ -1,3 +1,0 @@
-# Railway build configuration
-# Ignore client directory during build since it's served by the server
-client/

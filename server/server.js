@@ -10,39 +10,29 @@ const crypto = require('crypto');
 const NodeRSA = require('node-rsa');
 require('dotenv').config();
 
-// CipherTalk Server - Latest Version Sync
-// Deployment Timestamp: 2025-08-17 - Force Latest Code Sync
 const app = express();
 
 // Middleware
 app.use(express.json());
-// Dynamic CORS configuration
+// CORS configuration
 const allowedOrigins = [
     'http://localhost:5500', 
     'http://127.0.0.1:5500', 
     'http://localhost:3000', 
-    'http://127.0.0.1:3000',
-    'https://ciphertalk.dev',
-    'https://www.ciphertalk.dev',
-    'https://ciphertalk-6xzrl4szk-ragul-ravis-projects.vercel.app'
+    'http://127.0.0.1:3000'
 ];
 
-// Add production domain (replace with your actual domain)
+// Add production domains
 if (process.env.PRODUCTION_DOMAIN) {
     allowedOrigins.push(`https://${process.env.PRODUCTION_DOMAIN}`);
-    allowedOrigins.push(`http://${process.env.PRODUCTION_DOMAIN}`);
 }
-
-// Add Railway domain if available
 if (process.env.RAILWAY_PUBLIC_DOMAIN) {
     allowedOrigins.push(`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
 }
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, etc.)
         if (!origin) return callback(null, true);
-        
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -59,21 +49,16 @@ app.use((req, res, next) => {
     next();
 });
 
-// Ensure uploads directory exists
+// Ensure required directories exist
 const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    console.log('Created uploads directory at:', uploadDir);
-}
-
-// Ensure resources directory exists (for static files)
 const resourcesDir = path.join(__dirname, '..', 'resources');
-console.log('Resources directory path:', resourcesDir);
-if (!fs.existsSync(resourcesDir)) {
-    console.error('WARNING: Resources directory not found at:', resourcesDir);
-    fs.mkdirSync(resourcesDir, { recursive: true });
-    console.log('Created resources directory at:', resourcesDir);
-}
+
+[uploadDir, resourcesDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`Created directory: ${dir}`);
+    }
+});
 
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGODB_URI)
@@ -225,7 +210,7 @@ app.get('/api/user/:username/public-key', async (req, res) => {
         
         // Check if user has RSA keys, if not generate them
         if (!user.publicKey || !user.encryptedPrivateKey) {
-            console.log('User missing RSA keys, generating them...');
+    
             const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
             const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, user.passkey);
             
@@ -299,7 +284,7 @@ app.get('/api/user/:username/profile-picture', async (req, res) => {
 
 // Get all contacts
 app.get('/api/contacts', async (req, res) => {
-    console.log('GET /api/contacts triggered');
+
     try {
         const users = await User.find({}, { username: 1, profilePicture: 1, _id: 0 });
         console.log('Contacts found:', users.length);
@@ -496,7 +481,7 @@ app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
 
 // Enhanced steganography endpoint with RSA-AES encryption
 app.post('/api/messages/stego/send', upload.single('image'), async (req, res) => {
-    console.log('POST /api/messages/stego/send triggered');
+
     
     if (!req.file || !req.body.message || !req.body.sender || !req.body.receiver) {
         return res.status(400).json({
@@ -593,7 +578,7 @@ app.post('/api/messages/stego/send', upload.single('image'), async (req, res) =>
 
 // Steganography decryption endpoint
 app.post('/api/messages/stego/decrypt', async (req, res) => {
-    console.log('POST /api/messages/stego/decrypt triggered');
+
     
     try {
         const { imageUrl, username, passkey } = req.body;
@@ -650,7 +635,7 @@ app.post('/api/messages/stego/decrypt', async (req, res) => {
 
 // Steganography extraction endpoint (legacy)
 app.post('/api/messages/stego/extract', upload.single('image'), async (req, res) => {
-    console.log('POST /api/messages/stego/extract triggered');
+
     const bits = Math.min(Math.max(parseInt(req.body.bits) || 1, 1), 4);
     if (!req.file) {
         console.error('No file provided');
@@ -886,7 +871,7 @@ app.use(express.static(path.join(__dirname, '..')));
 
 // Profile Picture Upload Route
 app.post('/uploadProfilePicture', upload.single('profilePicture'), (req, res) => {
-    console.log('POST /uploadProfilePicture triggered');
+
     if (!req.file) {
         console.error('No file uploaded');
         return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -932,7 +917,7 @@ app.post('/check-username', async (req, res) => {
 
 // Registration endpoint
 app.post('/register', upload.single('profilePicture'), async (req, res) => {
-    console.log('POST /register triggered');
+
     console.log('Request body:', req.body);
     if (req.file) {
         console.log('Profile picture uploaded:', req.file.filename);
@@ -963,7 +948,7 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
         }
 
         // Generate RSA key pair
-        console.log('Generating RSA key pair...');
+
         const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
         
         // Encrypt private key with passkey
@@ -1031,7 +1016,7 @@ app.post('/complete-registration', upload.single('profilePicture'), async (req, 
         }
 
         // Generate RSA key pair
-        console.log('Generating RSA key pair for complete-registration...');
+
         const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
         
         // Encrypt private key with passkey
@@ -1086,7 +1071,7 @@ app.post('/login', async (req, res) => {
             });
         }
 
-        console.log('User found, comparing passwords');
+
         const isMatch = await bcrypt.compare(password, user.password);
         
         if (!isMatch) {
@@ -1115,19 +1100,19 @@ app.post('/login', async (req, res) => {
 
 // Add a test route
 app.get('/test', (req, res) => {
-    console.log('GET /test route triggered');
+
     res.json({ message: 'Server is reachable' });
 });
 
 // Add a debug route
 app.get('/debug', (req, res) => {
-    console.log('GET /debug route triggered');
+
     res.sendFile(path.join(__dirname, '..', 'debug.html'));
 });
 
 // Add a connection test page
 app.get('/connection-test', (req, res) => {
-    console.log('GET /connection-test route triggered');
+
     res.sendFile(path.join(__dirname, '..', 'connection-test.html'));
 });
 
