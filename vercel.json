@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "server/minimal-server.js",
+      "src": "server/optimized-server.js",
       "use": "@vercel/node"
     },
     {
@@ -45,7 +45,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server/minimal-server.js"
+      "dest": "server/optimized-server.js"
     },
     {
       "src": "/uploads/(.*)",
