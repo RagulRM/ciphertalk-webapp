@@ -30,6 +30,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "registration-test.html",
+      "use": "@vercel/static"
+    },
+    {
       "src": "resources/**",
       "use": "@vercel/static"
     }
