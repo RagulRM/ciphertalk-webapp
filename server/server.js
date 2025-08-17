@@ -66,7 +66,6 @@ const mongoOptions = {
     socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
     maxPoolSize: 1, // Reduce pool size for serverless
     bufferCommands: false, // Disable mongoose buffering
-    bufferMaxEntries: 0, // Disable mongoose buffering
     useUnifiedTopology: true,
     useNewUrlParser: true,
     maxIdleTimeMS: 30000,
