@@ -1362,7 +1362,13 @@ app.get('/api/connection-test', (req, res) => {
         environment: process.env.NODE_ENV || 'development',
         vercel: !!process.env.VERCEL,
         mongoConnected: mongoose.connection.readyState === 1,
-        corsOrigins: allowedOrigins
+        corsOrigins: allowedOrigins,
+        envVars: {
+            MONGODB_URI: process.env.MONGODB_URI ? 'DEFINED' : 'UNDEFINED',
+            PORT: process.env.PORT || 'undefined',
+            NODE_ENV: process.env.NODE_ENV || 'undefined',
+            PRODUCTION_DOMAIN: process.env.PRODUCTION_DOMAIN || 'undefined'
+        }
     });
 });
 
@@ -1373,6 +1379,19 @@ app.get('/api/health', (req, res) => {
         environment: process.env.NODE_ENV,
         database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
         timestamp: new Date().toISOString()
+    });
+});
+
+// Simple test endpoint - no database required
+app.get('/api/test', (req, res) => {
+    res.json({
+        success: true,
+        message: 'API is working!',
+        envCheck: {
+            MONGODB_URI: process.env.MONGODB_URI ? 'DEFINED' : 'UNDEFINED',
+            NODE_ENV: process.env.NODE_ENV || 'undefined',
+            VERCEL: process.env.VERCEL || 'undefined'
+        }
     });
 });
 
