@@ -51,20 +51,27 @@ app.use(cors({
     credentials: true
 }));
 
-// Ensure required directories exist
-const uploadDir = path.join(__dirname, 'uploads');
+// Ensure required directories exist (serverless compatible)
+const uploadDir = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
+const stegoDir = process.env.VERCEL ? '/tmp/uploads/stego' : path.join(__dirname, 'uploads', 'stego');
 const resourcesDir = path.join(__dirname, '..', 'resources');
 
-[uploadDir, resourcesDir].forEach(dir => {
+[uploadDir, stegoDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
 });
 
-// Multer configuration
+// Only create resources directory if not in serverless (read-only filesystem)
+if (!process.env.VERCEL && !fs.existsSync(resourcesDir)) {
+    fs.mkdirSync(resourcesDir, { recursive: true });
+}
+
+// Multer configuration with serverless support
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const uploadPath = path.join(__dirname, 'uploads');
+        // Use /tmp in Vercel serverless, local uploads directory otherwise
+        const uploadPath = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
         if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
         }
@@ -659,12 +666,6 @@ app.post('/api/messages/send', async (req, res) => {
     }
 });
 
-// Ensure stego uploads directory exists
-const stegoUploadDir = path.join(__dirname, 'uploads', 'stego');
-if (!fs.existsSync(stegoUploadDir)) {
-    fs.mkdirSync(stegoUploadDir, { recursive: true });
-}
-
 // Steganography endpoint
 app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
     if (!req.file || !req.body.message) {
@@ -691,7 +692,7 @@ app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
         
         // Generate unique filename
         const outputFilename = `stego_${Date.now()}.png`;
-        const outputPath = path.join(stegoUploadDir, outputFilename);
+        const outputPath = path.join(stegoDir, outputFilename);
         
         // Save the processed image
         await stegoImage.writeAsync(outputPath);
@@ -776,7 +777,7 @@ app.post('/api/messages/stego/send', upload.single('image'), async (req, res) =>
         
         // Generate unique filename
         const outputFilename = `stego_${Date.now()}.png`;
-        const outputPath = path.join(stegoUploadDir, outputFilename);
+        const outputPath = path.join(stegoDir, outputFilename);
         
         // Save the processed image
         await stegoImage.writeAsync(outputPath);
@@ -910,52 +911,35 @@ app.post('/api/messages/stego/extract', upload.single('image'), async (req, res)
     }
 });
 
-// Add this near the top of server.js, after requires
-const testUploadDir = () => {
-    const uploadDir = path.join(__dirname, 'uploads');
+// Serverless-compatible upload directory setup
+const testUploadDir = async () => {
+    // In Vercel serverless, use /tmp for file operations
+    const uploadDir = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
     
-    // Check if directory exists
-    if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // Test write permissions
     try {
-        const testFile = path.join(uploadDir, 'test-permissions.txt');
-        fs.writeFileSync(testFile, 'test');
-        fs.unlinkSync(testFile);
+        // Only test directory creation, no file operations in serverless
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        
+        // Skip permission tests in serverless environment
+        if (!process.env.VERCEL) {
+            const testFile = path.join(uploadDir, 'test-permissions.txt');
+            fs.writeFileSync(testFile, 'test');
+            fs.unlinkSync(testFile);
+        }
+        
+        console.log('✅ Upload directory ready:', uploadDir);
+        return uploadDir;
     } catch (error) {
-        console.error('❌ Upload directory permission error:', error);
-        process.exit(1);
+        console.error('❌ Upload directory setup failed:', error.message);
+        // Don't exit in serverless environment, just log the error
+        if (!process.env.VERCEL) {
+            process.exit(1);
+        }
+        return null;
     }
-
-    // Verify static serving
-    return new Promise((resolve) => {
-        const testPath = '/uploads/test-serve.txt';
-        const testFile = path.join(uploadDir, 'test-serve.txt');
-        
-        fs.writeFileSync(testFile, 'test');
-        
-        // Test static file serving
-        fetch(`http://localhost:${process.env.PORT || 3000}${testPath}`)
-            .then(res => {
-                fs.unlinkSync(testFile);
-                if (res.ok) {
-                    resolve(true);
-                } else {
-                    console.error('❌ Static serving not working');
-                    resolve(false);
-                }
-            })
-            .catch(err => {
-                fs.unlinkSync(testFile);
-                console.error('❌ Static serving error:', err);
-                resolve(false);
-            });
-    });
 };
-
-
 
 // Embed message into image
 async function embedMessageInImage(image, message, bits) {
@@ -1128,12 +1112,28 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     }
 }));
 
-// Make sure the stego directory is specifically handled
-app.use('/uploads/stego', express.static(path.join(__dirname, 'uploads', 'stego'), {
-    setHeaders: (res, filepath) => {
-        res.set('Content-Type', 'image/png');
-    }
-}));
+// Handle stego directory serving (serverless compatible)
+if (process.env.VERCEL) {
+    // In serverless, serve files from /tmp directly via API endpoint
+    app.get('/uploads/stego/:filename', (req, res) => {
+        const filename = req.params.filename;
+        const filePath = path.join('/tmp/uploads/stego', filename);
+        
+        if (fs.existsSync(filePath)) {
+            res.setHeader('Content-Type', 'image/png');
+            res.sendFile(filePath);
+        } else {
+            res.status(404).json({ error: 'File not found' });
+        }
+    });
+} else {
+    // Local development - use static serving
+    app.use('/uploads/stego', express.static(path.join(__dirname, 'uploads', 'stego'), {
+        setHeaders: (res, filepath) => {
+            res.set('Content-Type', 'image/png');
+        }
+    }));
+}
 
 // Debug resources access
 app.use('/resources', (req, res, next) => {
@@ -1439,10 +1439,25 @@ if (!process.env.VERCEL) {
         console.log(`🚀 Server is running on port ${PORT}`);
         console.log(`📱 Frontend URL: http://localhost:${PORT}`);
         console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
-        await testUploadDir();
+        try {
+            await testUploadDir();
+        } catch (err) {
+            console.error('Upload dir test failed:', err);
+        }
     });
 } else {
     console.log('🌐 Running in Vercel serverless mode');
-    // In production, ensure upload directories exist when the module loads
-    testUploadDir().catch(err => console.error('Upload dir test failed:', err));
+    // In serverless, just ensure directories exist without testing
+    try {
+        const uploadPath = '/tmp/uploads';
+        const stegoPath = '/tmp/uploads/stego';
+        [uploadPath, stegoPath].forEach(dir => {
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+        });
+        console.log('✅ Serverless upload directories ready');
+    } catch (err) {
+        console.error('⚠️ Upload dir setup warning:', err.message);
+    }
 }
