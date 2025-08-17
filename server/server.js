@@ -83,7 +83,39 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: process.env.VERCEL ? 4.5 * 1024 * 1024 : 50 * 1024 * 1024, // 4.5MB for Vercel, 50MB for local
+        fieldSize: process.env.VERCEL ? 1024 * 1024 : 10 * 1024 * 1024 // 1MB field size for Vercel
+    }
+});
+
+// Multer error handling middleware
+const handleMulterError = (err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({
+                success: false,
+                message: 'File too large. Maximum size is 4.5MB for images.',
+                code: 'FILE_TOO_LARGE'
+            });
+        }
+        if (err.code === 'LIMIT_FIELD_SIZE') {
+            return res.status(413).json({
+                success: false,
+                message: 'Request data too large.',
+                code: 'FIELD_TOO_LARGE'
+            });
+        }
+        return res.status(400).json({
+            success: false,
+            message: 'File upload error: ' + err.message,
+            code: err.code
+        });
+    }
+    next(err);
+};
 
 // Connect to MongoDB Atlas with optimized serverless options
 const mongoOptions = {
@@ -222,7 +254,7 @@ app.post('/api/check-username', async (req, res) => {
 });
 
 // API Registration endpoint
-app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
+app.post('/api/register', upload.single('profilePicture'), handleMulterError, async (req, res) => {
 
     try {
         // Ensure MongoDB connection
@@ -301,10 +333,25 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
         });
     } catch (error) {
         console.error('❌ API Registration error:', error);
+        
+        // Provide more specific error messages
+        let errorMessage = 'Registration failed';
+        if (error.code === 11000) {
+            errorMessage = 'Username already exists';
+        } else if (error.name === 'ValidationError') {
+            errorMessage = 'Invalid registration data';
+        } else if (error.message.includes('Database')) {
+            errorMessage = 'Database connection error';
+        }
+        
         res.status(500).json({ 
             success: false, 
-            message: 'Registration failed',
-            error: error.message 
+            message: errorMessage,
+            error: error.message,
+            debug: {
+                errorCode: error.code,
+                errorName: error.name
+            }
         });
     }
 });
@@ -599,6 +646,9 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
 // Send encrypted message
 app.post('/api/messages/send-encrypted', async (req, res) => {
     try {
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
         const { sender, receiver, message } = req.body;
         
         // Get receiver's public key
@@ -748,7 +798,7 @@ app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
 });
 
 // Enhanced steganography endpoint with RSA-AES encryption
-app.post('/api/messages/stego/send', upload.single('image'), async (req, res) => {
+app.post('/api/messages/stego/send', upload.single('image'), handleMulterError, async (req, res) => {
 
     
     if (!req.file || !req.body.message || !req.body.sender || !req.body.receiver) {
@@ -759,6 +809,9 @@ app.post('/api/messages/stego/send', upload.single('image'), async (req, res) =>
     }
 
     try {
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
         const { message, sender, receiver } = req.body;
         const bits = parseInt(req.body.bits) || 4;
 
