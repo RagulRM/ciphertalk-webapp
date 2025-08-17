@@ -1367,30 +1367,54 @@ app.post('/check-username', async (req, res) => {
     console.log('POST /check-username triggered with:', req.body);
     res.header('Access-Control-Allow-Origin', '*');
     
-    if (!req.body || !req.body.username) {
-        console.error('Missing username in request');
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Username is required' 
-        });
-    }
-
-    const username = req.body.username.trim();
-    console.log('Checking username:', username);
-
     try {
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
+        // Wait for database context to be ready
+        let attempts = 0;
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+            console.log(`Waiting for DB context in check-username... Attempt ${attempts}`);
+        }
+        
+        if (!mongoose.connection.db) {
+            throw new Error('Database context not available for username check');
+        }
+        
+        if (!req.body || !req.body.username) {
+            console.error('Missing username in request');
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Username is required' 
+            });
+        }
+
+        const username = req.body.username.trim();
+        console.log('✅ Checking username:', username, 'in database:', mongoose.connection.db.databaseName);
+
         const existingUser = await User.findOne({ username });
         console.log('Database query result:', existingUser ? 'User exists' : 'Username available');
         
         return res.status(200).json({
             exists: !!existingUser,
-            message: existingUser ? 'Username already exists.' : 'Username is available.'
+            message: existingUser ? 'Username already exists.' : 'Username is available.',
+            debug: {
+                database: mongoose.connection.db.databaseName,
+                readyState: mongoose.connection.readyState
+            }
         });
     } catch (err) {
-        console.error('Database error:', err);
+        console.error('❌ Username check error:', err);
         return res.status(500).json({ 
             success: false, 
-            message: 'Server error checking username' 
+            message: 'Server error checking username',
+            error: err.message,
+            debug: {
+                readyState: mongoose.connection.readyState,
+                dbExists: !!mongoose.connection.db
+            }
         });
     }
 });

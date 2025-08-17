@@ -19,7 +19,7 @@
     <!-- Registration Form (Initially hidden) -->
     <form id="registerForm" class="form-container" style="display: none;">
         <h2>Create Account</h2>
-        <input type="text" id="registerUsername" placeholder="Username" required class="input-field" />
+        <input type="text" id="registerUsername" placeholder="Username" required class="input-field" autocomplete="username" />
         <input type="password" id="registerPassword" placeholder="Password" required class="input-field" autocomplete="new-password">
         <input type="password" id="registerPasskey" placeholder="Passkey" required class="input-field" autocomplete="new-password">
         <button type="submit" class="button">Register</button>
@@ -29,7 +29,7 @@
     <!-- Login Form (Initially hidden) -->
     <form id="loginForm" class="form-container" style="display: none;">
         <h2>Login</h2>
-        <input type="text" id="loginUsername" placeholder="Username" required class="input-field" />
+        <input type="text" id="loginUsername" placeholder="Username" required class="input-field" autocomplete="username" />
         <input type="password" id="loginPassword" placeholder="Password" required class="input-field" autocomplete="current-password">
         <button type="submit" class="button">Login</button>
         <button type="button" id="goBackLogin" class="button go-back-button">Go back</button>
