@@ -30,6 +30,14 @@ if (process.env.RAILWAY_PUBLIC_DOMAIN) {
     allowedOrigins.push(`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
 }
 
+// Add Vercel deployment URLs
+if (process.env.VERCEL_URL) {
+    allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+}
+// Common Vercel project pattern
+allowedOrigins.push('https://ciphertalk-webapp.vercel.app');
+allowedOrigins.push('https://ciphertalk-webapp-ragulrm.vercel.app');
+
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
@@ -56,6 +64,23 @@ const resourcesDir = path.join(__dirname, '..', 'resources');
         fs.mkdirSync(dir, { recursive: true });
     }
 });
+
+// Multer configuration
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadPath = path.join(__dirname, 'uploads');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        const outName = Date.now() + '-' + file.originalname;
+        cb(null, outName);
+    }
+});
+
+const upload = multer({ storage: storage });
 
 // Connect to MongoDB Atlas with proper serverless options
 const mongoOptions = {
@@ -326,7 +351,19 @@ app.get('/api/db-inspect', async (req, res) => {
     }
 });
 
-// Environment debug endpoint
+// Message Schema
+const MessageSchema = new mongoose.Schema({
+    sender:    { type: String, required: true },
+    receiver:  { type: String, required: true },
+    content:   { type: String, required: true },
+    type:      { type: String, enum: ['text','encrypted','stego'], required: true },
+    encryptedAESKey: String,
+    iv:             String,
+    originalText:   String,
+    timestamp:      { type: Date, default: Date.now }
+});
+
+const Message = mongoose.model('Message', MessageSchema);
 
 // User Schema
 const UserSchema = new mongoose.Schema({
@@ -339,36 +376,6 @@ const UserSchema = new mongoose.Schema({
 });
 
 const User = mongoose.model('User', UserSchema);
-
-// Multer configuration
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const uploadPath = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        const outName = Date.now() + path.extname(file.originalname);
-        cb(null, outName);
-    }
-});
-
-const upload = multer({ storage: storage });
-
-// Message Schema
-const MessageSchema = new mongoose.Schema({
-    sender:    { type: String, required: true },
-    receiver:  { type: String, required: true },
-    content:   { type: String, required: true },
-    type:      { type: String, enum: ['text','encrypted','stego'], required: true },
-    encryptedAESKey: String,
-    iv:             String,
-    originalText:   String,               // <–– new field
-    timestamp:      { type: Date, default: Date.now }
-  });
-  const Message = mongoose.model('Message', MessageSchema);
 
 // Encryption Utility Functions
 class EncryptionUtils {
@@ -587,7 +594,11 @@ app.post('/api/messages/send-encrypted', async (req, res) => {
             originalText: message       // <–– store the plaintext
         });
         await newMessage.save();
-        res.status(201).json({ success: true, message: 'Encrypted message sent successfully' });
+        res.status(201).json({ 
+            success: true, 
+            message: newMessage,
+            info: 'Encrypted message sent successfully'
+        });
     } catch (error) {
         console.error('Error sending encrypted message:', error);
         res.status(500).json({ success: false, message: 'Error sending encrypted message' });
@@ -998,7 +1009,10 @@ async function extractMessageFromImage(image, bits) {
         const width = image.getWidth();
         const height = image.getHeight();
         let binaryMessage = '';
+        let messageLength = null;
+        let lengthParsed = false;
 
+        // First, extract enough bits to get the length prefix
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const pixel = jimp.intToRGBA(image.getPixelColor(x, y));
@@ -1008,6 +1022,56 @@ async function extractMessageFromImage(image, bits) {
                         .padStart(bits, '0');
                     binaryMessage += bitsFromChannel;
                 });
+
+                // Try to parse length after collecting some data
+                if (!lengthParsed && binaryMessage.length >= 32) { // Enough bits to check for length
+                    try {
+                        const bytes = [];
+                        for (let i = 0; i + 8 <= binaryMessage.length; i += 8) {
+                            bytes.push(parseInt(binaryMessage.substr(i, 8), 2));
+                        }
+                        const partialText = Buffer.from(bytes).toString('utf8');
+                        const lengthMatch = partialText.match(/^(\d+)%%%/);
+                        if (lengthMatch) {
+                            messageLength = parseInt(lengthMatch[1], 10);
+                            lengthParsed = true;
+                            
+                            // Calculate total bits needed: length prefix + "%%%" + message
+                            const lengthPrefix = lengthMatch[0];
+                            const totalCharsNeeded = lengthPrefix.length + messageLength;
+                            const totalBitsNeeded = totalCharsNeeded * 8;
+                            
+                            // If we have enough bits, we can stop early
+                            if (binaryMessage.length >= totalBitsNeeded) {
+                                break;
+                            }
+                        }
+                    } catch (e) {
+                        // Continue extracting if we can't parse yet
+                    }
+                }
+
+                // If we know the length and have enough bits, stop extracting
+                if (lengthParsed && messageLength !== null) {
+                    const lengthPrefixLength = messageLength.toString().length + 3; // +3 for "%%%"
+                    const totalCharsNeeded = lengthPrefixLength + messageLength;
+                    const totalBitsNeeded = totalCharsNeeded * 8;
+                    
+                    if (binaryMessage.length >= totalBitsNeeded) {
+                        break;
+                    }
+                }
+            }
+            
+            // Break outer loop if we have enough data
+            if (lengthParsed && messageLength !== null) {
+                const lengthPrefixLength = messageLength.toString().length + 3; // +3 for "%%%"
+                const totalCharsNeeded = lengthPrefixLength + messageLength;
+                const totalBitsNeeded = totalCharsNeeded * 8;
+                
+                if (binaryMessage.length >= totalBitsNeeded) {
+                    break;
+                }
             }
         }
 
@@ -1219,11 +1283,7 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
         });
 
         await newUser.save();
-            username: newUser.username,
-            passkey: newUser.passkey,
-            profilePicture: newUser.profilePicture,
-            hasRSAKeys: !!(newUser.publicKey && newUser.encryptedPrivateKey)
-        });
+        console.log('User registered successfully:', username);
         
         return res.status(201).json({ 
             success: true, 
@@ -1290,6 +1350,7 @@ app.post('/login', async (req, res) => {
         // Ensure MongoDB connection
         await connectToDatabase();
         
+        console.log('POST /login triggered with body:', {
             username: req.body.username,
             passwordProvided: !!req.body.password
         });
@@ -1329,6 +1390,59 @@ app.post('/login', async (req, res) => {
         });
     } catch (err) {
         console.error('Error during login:', err);
+        return res.status(500).json({ 
+            success: false,
+            message: 'Server error',
+            error: err.message 
+        });
+    }
+});
+
+// API Login Route (for frontend compatibility)
+app.post('/api/login', async (req, res) => {
+    try {
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
+        console.log('POST /api/login triggered with body:', {
+            username: req.body.username,
+            passwordProvided: !!req.body.password
+        });
+        
+        if (!req.body.username || !req.body.password) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Username and password are required' 
+            });
+        }
+        
+        const { username, password } = req.body;
+
+        let user = await User.findOne({ username });
+        
+        if (!user) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Invalid credentials' 
+            });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        
+        if (!isMatch) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Invalid credentials' 
+            });
+        }
+
+        return res.status(200).json({ 
+            success: true,
+            message: 'Login successful',
+            username: user.username
+        });
+    } catch (err) {
+        console.error('Error during API login:', err);
         return res.status(500).json({ 
             success: false,
             message: 'Server error',
@@ -1396,10 +1510,13 @@ module.exports = app;
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, async () => {
+        console.log(`🚀 Server is running on port ${PORT}`);
+        console.log(`📱 Frontend URL: http://localhost:${PORT}`);
+        console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
         await testUploadDir();
     });
+} else {
+    console.log('🌐 Running in Vercel serverless mode');
+    // In production, ensure upload directories exist
+    testUploadDir().catch(err => console.error('Upload dir test failed:', err));
 }
-
-
-
-

@@ -30,14 +30,6 @@
       "use": "@vercel/static"
     },
     {
-      "src": "registration-test.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "debug-test.html",
-      "use": "@vercel/static"
-    },
-    {
       "src": "resources/**",
       "use": "@vercel/static"
     }
@@ -98,14 +90,6 @@
     {
       "src": "/contacts.html",
       "dest": "/contacts.html"
-    },
-    {
-      "src": "/registration-test.html",
-      "dest": "/registration-test.html"
-    },
-    {
-      "src": "/debug-test.html",
-      "dest": "/debug-test.html"
     },
     {
       "src": "/(.*)",
