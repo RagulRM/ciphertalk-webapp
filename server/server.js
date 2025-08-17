@@ -1129,12 +1129,6 @@ app.get('/api/connection-test', (req, res) => {
     });
 });
 
-// Fallback route
-app.get('*', (req, res) => {
-    console.log('Fallback route triggered, serving index.html');
-    res.sendFile(path.join(__dirname, '..', 'index.html'));
-});
-
 // Endpoint to verify password and return the passkey
 app.post('/api/auth/verify-password', async (req, res) => {
   try {
@@ -1162,6 +1156,12 @@ app.post('/api/auth/verify-password', async (req, res) => {
     console.error('Error verifying password:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
+});
+
+// Fallback route - MUST BE LAST
+app.get('*', (req, res) => {
+    console.log('Fallback route triggered, serving index.html');
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
 // Make sure the PORT is defined first
