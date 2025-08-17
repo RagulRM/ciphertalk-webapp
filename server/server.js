@@ -85,15 +85,17 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Connect to MongoDB Atlas with proper serverless options
+// Connect to MongoDB Atlas with optimized serverless options
 const mongoOptions = {
-    serverSelectionTimeoutMS: 30000, // Increase timeout to 30s for initial connection
-    socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
-    maxPoolSize: 1, // Reduce pool size for serverless
+    serverSelectionTimeoutMS: process.env.VERCEL ? 10000 : 30000, // Shorter timeout for serverless
+    socketTimeoutMS: process.env.VERCEL ? 15000 : 45000, // Shorter socket timeout for serverless
+    connectTimeoutMS: process.env.VERCEL ? 10000 : 30000, // Explicit connect timeout
+    maxPoolSize: 1, // Single connection for serverless
     bufferCommands: false, // Disable mongoose buffering
     useUnifiedTopology: true,
     useNewUrlParser: true,
     maxIdleTimeMS: 30000,
+    heartbeatFrequencyMS: 10000, // More frequent heartbeat for serverless
     serverApi: {
         version: '1',
         strict: true,
@@ -122,32 +124,43 @@ const connectToDatabase = async () => {
             throw new Error('MONGODB_URI environment variable is not defined');
         }
         
-        // Add event listeners for debugging
-        mongoose.connection.on('connecting', () => {
-        });
+        console.log('🔄 Connecting to MongoDB...');
         
-        mongoose.connection.on('connected', () => {
-        });
+        // Close existing connection if in error state
+        if (mongoose.connection.readyState === 3) {
+            await mongoose.disconnect();
+        }
         
-        mongoose.connection.on('error', (err) => {
-            console.error('❌ Mongoose connection error:', err);
-        });
-        
-        mongoose.connection.on('disconnected', () => {
-        });
+        // Add event listeners for debugging (only once)
+        if (!mongoose.connection.listeners('connecting').length) {
+            mongoose.connection.on('connecting', () => {
+                console.log('🔄 MongoDB connecting...');
+            });
+            
+            mongoose.connection.on('connected', () => {
+                console.log('✅ MongoDB connected successfully');
+            });
+            
+            mongoose.connection.on('error', (err) => {
+                console.error('❌ Mongoose connection error:', err.message);
+            });
+            
+            mongoose.connection.on('disconnected', () => {
+                console.log('⚠️ MongoDB disconnected');
+            });
+        }
         
         cachedConnection = await mongoose.connect(process.env.MONGODB_URI, mongoOptions);
+        console.log('✅ Database connection established');
         return cachedConnection;
     } catch (error) {
         console.error('❌ Failed to connect to MongoDB Database:', error.message);
+        cachedConnection = null; // Reset cache on failure
         throw error;
     }
 };
 
-// Start initial connection attempt (non-blocking)
-connectToDatabase().catch(err => {
-    console.error('Initial connection failed:', err.message);
-});
+// Don't start initial connection in serverless - connect on-demand only
 
 // API Check if username exists
 app.post('/api/check-username', async (req, res) => {
@@ -1352,24 +1365,52 @@ app.post('/api/login', async (req, res) => {
 // Add a connection test page
 
 // API connectivity test endpoint
-app.get('/api/connection-test', (req, res) => {
-    res.json({
-        success: true,
-        message: 'Server connection successful',
-        timestamp: new Date().toISOString(),
-        origin: req.get('origin'),
-        host: req.get('host'),
-        environment: process.env.NODE_ENV || 'development',
-        vercel: !!process.env.VERCEL,
-        mongoConnected: mongoose.connection.readyState === 1,
-        corsOrigins: allowedOrigins,
-        envVars: {
-            MONGODB_URI: process.env.MONGODB_URI ? 'DEFINED' : 'UNDEFINED',
-            PORT: process.env.PORT || 'undefined',
-            NODE_ENV: process.env.NODE_ENV || 'undefined',
-            PRODUCTION_DOMAIN: process.env.PRODUCTION_DOMAIN || 'undefined'
+app.get('/api/connection-test', async (req, res) => {
+    try {
+        // Test database connection
+        let dbStatus = 'disconnected';
+        let dbError = null;
+        
+        try {
+            await connectToDatabase();
+            if (mongoose.connection.readyState === 1) {
+                // Test a simple database operation
+                const userCount = await User.countDocuments();
+                dbStatus = `connected (${userCount} users)`;
+            } else {
+                dbStatus = `connection state: ${mongoose.connection.readyState}`;
+            }
+        } catch (err) {
+            dbStatus = 'connection failed';
+            dbError = err.message;
         }
-    });
+        
+        res.json({
+            success: true,
+            message: 'Server connection successful',
+            timestamp: new Date().toISOString(),
+            origin: req.get('origin'),
+            host: req.get('host'),
+            environment: process.env.NODE_ENV || 'development',
+            vercel: !!process.env.VERCEL,
+            mongoConnected: mongoose.connection.readyState === 1,
+            dbStatus: dbStatus,
+            dbError: dbError,
+            corsOrigins: allowedOrigins,
+            envVars: {
+                MONGODB_URI: process.env.MONGODB_URI ? 'DEFINED' : 'UNDEFINED',
+                PORT: process.env.PORT || 'undefined',
+                NODE_ENV: process.env.NODE_ENV || 'undefined',
+                PRODUCTION_DOMAIN: process.env.PRODUCTION_DOMAIN || 'undefined'
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: error.stack
+        });
+    }
 });
 
 // Production health check
