@@ -51,11 +51,6 @@ app.use(cors({
     credentials: true
 }));
 
-// Logging middleware
-app.use((req, res, next) => {
-    next();
-});
-
 // Ensure required directories exist
 const uploadDir = path.join(__dirname, 'uploads');
 const resourcesDir = path.join(__dirname, '..', 'resources');
@@ -137,11 +132,7 @@ connectToDatabase().catch(err => {
     console.error('Initial connection failed:', err.message);
 });
 
-// Test MongoDB connection endpoint
-
-// Alternative connection test with different options
-
-// API Check if username exists (alternative to /check-username)
+// API Check if username exists
 app.post('/api/check-username', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     
@@ -194,7 +185,7 @@ app.post('/api/check-username', async (req, res) => {
     }
 });
 
-// API Registration endpoint (alternative to /register)
+// API Registration endpoint
 app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
 
     try {
@@ -665,7 +656,6 @@ if (!fs.existsSync(stegoUploadDir)) {
 }
 
 // Steganography endpoint
-// Update steganography endpoint to save images in 'uploads/stego'
 app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
     if (!req.file || !req.body.message) {
         return res.status(400).json({
@@ -1166,59 +1156,6 @@ app.post('/uploadProfilePicture', upload.single('profilePicture'), (req, res) =>
     res.json({ success: true, filePath: profilePicturePath });
 });
 
-// Check if username exists
-app.post('/check-username', async (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    
-    try {
-        // Ensure MongoDB connection
-        await connectToDatabase();
-        
-        // Wait for database context to be ready
-        let attempts = 0;
-        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            attempts++;
-        }
-        
-        if (!mongoose.connection.db) {
-            throw new Error('Database context not available for username check');
-        }
-        
-        if (!req.body || !req.body.username) {
-            console.error('Missing username in request');
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Username is required' 
-            });
-        }
-
-        const username = req.body.username.trim();
-
-        const existingUser = await User.findOne({ username });
-        
-        return res.status(200).json({
-            exists: !!existingUser,
-            message: existingUser ? 'Username already exists.' : 'Username is available.',
-            debug: {
-                database: mongoose.connection.db.databaseName,
-                readyState: mongoose.connection.readyState
-            }
-        });
-    } catch (err) {
-        console.error('❌ Username check error:', err);
-        return res.status(500).json({ 
-            success: false, 
-            message: 'Server error checking username',
-            error: err.message,
-            debug: {
-                readyState: mongoose.connection.readyState,
-                dbExists: !!mongoose.connection.db
-            }
-        });
-    }
-});
-
 // Registration endpoint
 app.post('/register', upload.single('profilePicture'), async (req, res) => {
 
@@ -1342,60 +1279,6 @@ app.post('/complete-registration', upload.single('profilePicture'), async (req, 
     } catch (err) {
         console.error('Error during complete-registration:', err);
         res.status(500).json({ success: false, message: 'Error registering user', error: err.message });
-    }
-});
-
-// Login Route
-app.post('/login', async (req, res) => {
-    try {
-        // Ensure MongoDB connection
-        await connectToDatabase();
-        
-        console.log('POST /login triggered with body:', {
-            username: req.body.username,
-            passwordProvided: !!req.body.password
-        });
-        
-        if (!req.body.username || !req.body.password) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Username and password are required' 
-            });
-        }
-        
-        const { username, password } = req.body;
-
-        let user = await User.findOne({ username });
-        
-        if (!user) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Invalid credentials' 
-            });
-        }
-
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        
-        if (!isMatch) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Invalid credentials' 
-            });
-        }
-
-        return res.status(200).json({ 
-            success: true,
-            message: 'Login successful',
-            username: user.username
-        });
-    } catch (err) {
-        console.error('Error during login:', err);
-        return res.status(500).json({ 
-            success: false,
-            message: 'Server error',
-            error: err.message 
-        });
     }
 });
 
