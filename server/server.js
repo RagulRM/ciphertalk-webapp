@@ -72,12 +72,20 @@ const mongoOptions = {
     }
 };
 
+console.log('MongoDB URI:', process.env.MONGODB_URI ? 'SET (length: ' + process.env.MONGODB_URI.length + ')' : 'NOT SET');
+
 mongoose.connect(process.env.MONGODB_URI, mongoOptions)
     .then(() => {
-        console.log('Connected to MongoDB Database');
+        console.log('✅ Connected to MongoDB Database successfully');
     })
     .catch((err) => {
-        console.error('Failed to connect to MongoDB Database', err);
+        console.error('❌ Failed to connect to MongoDB Database:', err.message);
+        console.error('Connection string format check:', {
+            hasUsername: process.env.MONGODB_URI?.includes('Ragul'),
+            hasPassword: process.env.MONGODB_URI?.includes('RagulCipher'),
+            hasDatabase: process.env.MONGODB_URI?.includes('ciphertalk'),
+            hasCluster: process.env.MONGODB_URI?.includes('useridcluster')
+        });
     });
 
 // Debug endpoint to check MongoDB connection and environment
