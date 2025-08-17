@@ -312,6 +312,50 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// Password verification endpoint for passkey viewing
+app.post('/api/auth/verify-password', async (req, res) => {
+    try {
+        await connectToDatabase();
+        
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Username and password are required' 
+            });
+        }
+        
+        const user = await User.findOne({ username });
+        if (!user) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+        
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Invalid password' 
+            });
+        }
+        
+        res.json({ 
+            success: true,
+            passkey: user.passkey
+        });
+        
+    } catch (error) {
+        console.error('Error verifying password:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error' 
+        });
+    }
+});
+
 // Fallback for static files
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'index.html'));

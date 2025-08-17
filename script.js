@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Login attempt:', { username, serverURL: getServerURL() });
         
         try {
-            const response = await fetch(`${getServerURL()}/login`, {
+            const response = await fetch(`${getServerURL()}/api/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
