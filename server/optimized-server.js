@@ -215,11 +215,9 @@ app.post('/api/register', async (req, res) => {
 
         console.log('✅ Username available, proceeding with registration');
 
-        // Generate RSA key pair
-        const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
-        
-        // Encrypt private key with passkey
-        const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
+        // Temporarily use simple keys instead of RSA generation
+        const publicKey = 'simple-public-key-' + Date.now();
+        const encryptedPrivateKey = 'simple-encrypted-private-key-' + Date.now();
 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
