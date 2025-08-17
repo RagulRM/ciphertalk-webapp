@@ -255,6 +255,119 @@ app.get('/api/test-connection-alt', async (req, res) => {
     }
 });
 
+// Simple registration test endpoint (no file upload)
+app.post('/api/test-registration', async (req, res) => {
+    try {
+        console.log('🧪 Test registration endpoint called');
+        
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
+        // Wait for database context to be ready
+        let attempts = 0;
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+            console.log(`Waiting for DB context in test registration... Attempt ${attempts}`);
+        }
+        
+        if (!mongoose.connection.db) {
+            throw new Error('Database context not available for test registration');
+        }
+        
+        console.log('✅ Database context ready for test registration');
+        
+        const { username, password, passkey } = req.body;
+        
+        if (!username || !password || !passkey) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required',
+                provided: { username: !!username, password: !!password, passkey: !!passkey }
+            });
+        }
+        
+        console.log(`🔍 Test: Checking for existing user: ${username}`);
+        
+        // Check for existing user
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            console.log('❌ Test: Username already exists:', username);
+            return res.status(400).json({
+                success: false,
+                message: 'Username already exists',
+                debug: { database: mongoose.connection.db.databaseName }
+            });
+        }
+        
+        console.log('✅ Test: Username available, creating user...');
+        
+        // Generate RSA key pair
+        console.log('🔑 Test: Generating RSA keys...');
+        const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
+        
+        // Encrypt private key with passkey
+        console.log('🔐 Test: Encrypting private key...');
+        const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
+        
+        // Hash password
+        console.log('🔒 Test: Hashing password...');
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // Create new user
+        console.log('👤 Test: Creating user document...');
+        const newUser = new User({
+            username,
+            password: hashedPassword,
+            passkey,
+            publicKey,
+            encryptedPrivateKey,
+            profilePicture: 'resources/Default.jpg'
+        });
+        
+        console.log('💾 Test: Saving user to database...');
+        const savedUser = await newUser.save();
+        console.log('✅ Test: User saved successfully with ID:', savedUser._id);
+        
+        // Verify user was saved
+        const userCount = await User.countDocuments();
+        console.log('📊 Test: Total users in database:', userCount);
+        
+        res.json({
+            success: true,
+            message: 'Test registration successful',
+            debug: {
+                userId: savedUser._id,
+                database: mongoose.connection.db.databaseName,
+                totalUsers: userCount,
+                steps: [
+                    '✅ Connection established',
+                    '✅ Database context ready', 
+                    '✅ Username available',
+                    '✅ RSA keys generated',
+                    '✅ Private key encrypted',
+                    '✅ Password hashed',
+                    '✅ User document created',
+                    '✅ User saved to database'
+                ]
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Test registration error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Test registration failed',
+            error: error.message,
+            stack: error.stack,
+            debug: {
+                database: mongoose.connection.db?.databaseName,
+                readyState: mongoose.connection.readyState
+            }
+        });
+    }
+});
+
 // Test registration with database debugging
 app.post('/api/register-debug', async (req, res) => {
     try {

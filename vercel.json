@@ -92,6 +92,10 @@
       "dest": "/contacts.html"
     },
     {
+      "src": "/registration-test.html",
+      "dest": "/registration-test.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
