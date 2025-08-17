@@ -88,6 +88,24 @@ const connectToDatabase = async () => {
 
     try {
         console.log('🔄 Attempting MongoDB connection...');
+        
+        // Add event listeners for debugging
+        mongoose.connection.on('connecting', () => {
+            console.log('📡 Mongoose connecting to MongoDB...');
+        });
+        
+        mongoose.connection.on('connected', () => {
+            console.log('✅ Mongoose connected to MongoDB');
+        });
+        
+        mongoose.connection.on('error', (err) => {
+            console.error('❌ Mongoose connection error:', err);
+        });
+        
+        mongoose.connection.on('disconnected', () => {
+            console.log('🔌 Mongoose disconnected from MongoDB');
+        });
+        
         cachedConnection = await mongoose.connect(process.env.MONGODB_URI, mongoOptions);
         console.log('✅ Connected to MongoDB Database successfully');
         return cachedConnection;
@@ -141,33 +159,98 @@ app.get('/api/debug', async (req, res) => {
 // Test MongoDB connection endpoint
 app.get('/api/test-connection', async (req, res) => {
     try {
-        // Ensure connection first
-        await connectToDatabase();
+        console.log('🔄 Starting connection test...');
         
-        // Wait a moment for connection to fully establish
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Check current state
+        console.log('Current readyState:', mongoose.connection.readyState);
         
-        // Check if we have a proper connection
+        // Force a fresh connection attempt
         if (mongoose.connection.readyState !== 1) {
-            throw new Error(`Connection not ready. State: ${mongoose.connection.readyState}`);
+            console.log('⚡ Attempting fresh connection...');
+            await connectToDatabase();
+        }
+        
+        // Wait longer for connection to establish
+        console.log('⏳ Waiting for connection to stabilize...');
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        while (mongoose.connection.readyState !== 1 && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            attempts++;
+            console.log(`Attempt ${attempts}: readyState = ${mongoose.connection.readyState}`);
+        }
+        
+        // Final state check
+        if (mongoose.connection.readyState !== 1) {
+            throw new Error(`Connection failed to establish after ${maxAttempts} seconds. Final state: ${mongoose.connection.readyState}`);
         }
         
         // Try to perform a simple database operation
+        console.log('🏓 Attempting database ping...');
         const testResult = await mongoose.connection.db.admin().ping();
+        
         res.json({
             success: true,
             message: 'MongoDB connection successful',
             pingResult: testResult,
             readyState: mongoose.connection.readyState,
-            dbName: mongoose.connection.db.databaseName
+            dbName: mongoose.connection.db.databaseName,
+            host: mongoose.connection.host,
+            port: mongoose.connection.port
         });
     } catch (error) {
+        console.error('❌ Connection test failed:', error);
         res.status(500).json({
             success: false,
             message: 'MongoDB connection failed',
             error: error.message,
             readyState: mongoose.connection.readyState,
             stack: error.stack
+        });
+    }
+});
+
+// Alternative connection test with different options
+app.get('/api/test-connection-alt', async (req, res) => {
+    try {
+        console.log('🧪 Testing alternative connection method...');
+        
+        // Try with minimal options
+        const altOptions = {
+            serverSelectionTimeoutMS: 10000,
+            connectTimeoutMS: 10000,
+            socketTimeoutMS: 10000,
+        };
+        
+        // Create a separate connection for testing
+        const testConnection = await mongoose.createConnection(process.env.MONGODB_URI, altOptions);
+        
+        // Test the connection
+        const isConnected = testConnection.readyState === 1;
+        
+        if (isConnected) {
+            const ping = await testConnection.db.admin().ping();
+            await testConnection.close();
+            
+            res.json({
+                success: true,
+                message: 'Alternative connection successful',
+                pingResult: ping
+            });
+        } else {
+            await testConnection.close();
+            res.status(500).json({
+                success: false,
+                message: 'Alternative connection failed',
+                readyState: testConnection.readyState
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Alternative connection test failed',
+            error: error.message
         });
     }
 });
