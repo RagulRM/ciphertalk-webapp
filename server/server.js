@@ -36,7 +36,6 @@ app.use(cors({
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            console.log('CORS blocked origin:', origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -45,7 +44,6 @@ app.use(cors({
 
 // Logging middleware
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] - ${req.method} ${req.url}`);
     next();
 });
 
@@ -56,7 +54,6 @@ const resourcesDir = path.join(__dirname, '..', 'resources');
 [uploadDir, resourcesDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
-        console.log(`Created directory: ${dir}`);
     }
 });
 
@@ -76,7 +73,6 @@ const mongoOptions = {
     }
 };
 
-console.log('MongoDB URI:', process.env.MONGODB_URI ? 'SET (length: ' + process.env.MONGODB_URI.length + ')' : 'NOT SET');
 
 // Connection promise for serverless
 let cachedConnection = null;
@@ -87,15 +83,12 @@ const connectToDatabase = async () => {
     }
 
     try {
-        console.log('🔄 Attempting MongoDB connection...');
         
         // Add event listeners for debugging
         mongoose.connection.on('connecting', () => {
-            console.log('📡 Mongoose connecting to MongoDB...');
         });
         
         mongoose.connection.on('connected', () => {
-            console.log('✅ Mongoose connected to MongoDB');
         });
         
         mongoose.connection.on('error', (err) => {
@@ -103,11 +96,9 @@ const connectToDatabase = async () => {
         });
         
         mongoose.connection.on('disconnected', () => {
-            console.log('🔌 Mongoose disconnected from MongoDB');
         });
         
         cachedConnection = await mongoose.connect(process.env.MONGODB_URI, mongoOptions);
-        console.log('✅ Connected to MongoDB Database successfully');
         return cachedConnection;
     } catch (error) {
         console.error('❌ Failed to connect to MongoDB Database:', error.message);
@@ -120,144 +111,12 @@ connectToDatabase().catch(err => {
     console.error('Initial connection failed:', err.message);
 });
 
-// Debug endpoint to check MongoDB connection and environment
-app.get('/api/debug', async (req, res) => {
-    try {
-        const mongoUri = process.env.MONGODB_URI ? 'SET' : 'NOT SET';
-        const mongoState = mongoose.connection.readyState;
-        const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
-        
-        // Additional debug info
-        const connectionString = process.env.MONGODB_URI;
-        const debugInfo = {
-            mongoUri: mongoUri,
-            mongoState: states[mongoState] || 'unknown',
-            nodeEnv: process.env.NODE_ENV || 'not set',
-            timestamp: new Date().toISOString(),
-            // Connection string analysis (masked for security)
-            connectionAnalysis: connectionString ? {
-                hasProtocol: connectionString.startsWith('mongodb+srv://'),
-                hasUsername: connectionString.includes('Ragul'),
-                hasCluster: connectionString.includes('useridcluster'),
-                hasDatabase: connectionString.includes('/ciphertalk'),
-                hasPassword: connectionString.includes('RagulCipher'),
-                hasRetryWrites: connectionString.includes('retryWrites=true'),
-                length: connectionString.length,
-                // Show first and last 10 characters for debugging
-                preview: connectionString.substring(0, 10) + '...' + connectionString.substring(connectionString.length - 10)
-            } : null,
-            mongooseVersion: mongoose.version,
-            serverSelectionTimeoutMS: 30000
-        };
-
-        res.json(debugInfo);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
 // Test MongoDB connection endpoint
-app.get('/api/test-connection', async (req, res) => {
-    try {
-        console.log('🔄 Starting connection test...');
-        
-        // Check current state
-        console.log('Current readyState:', mongoose.connection.readyState);
-        
-        // Force a fresh connection attempt
-        if (mongoose.connection.readyState !== 1) {
-            console.log('⚡ Attempting fresh connection...');
-            await connectToDatabase();
-        }
-        
-        // Wait longer for connection to establish
-        console.log('⏳ Waiting for connection to stabilize...');
-        let attempts = 0;
-        const maxAttempts = 10;
-        
-        while (mongoose.connection.readyState !== 1 && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            attempts++;
-            console.log(`Attempt ${attempts}: readyState = ${mongoose.connection.readyState}`);
-        }
-        
-        // Final state check
-        if (mongoose.connection.readyState !== 1) {
-            throw new Error(`Connection failed to establish after ${maxAttempts} seconds. Final state: ${mongoose.connection.readyState}`);
-        }
-        
-        // Try to perform a simple database operation
-        console.log('🏓 Attempting database ping...');
-        const testResult = await mongoose.connection.db.admin().ping();
-        
-        res.json({
-            success: true,
-            message: 'MongoDB connection successful',
-            pingResult: testResult,
-            readyState: mongoose.connection.readyState,
-            dbName: mongoose.connection.db.databaseName,
-            host: mongoose.connection.host,
-            port: mongoose.connection.port
-        });
-    } catch (error) {
-        console.error('❌ Connection test failed:', error);
-        res.status(500).json({
-            success: false,
-            message: 'MongoDB connection failed',
-            error: error.message,
-            readyState: mongoose.connection.readyState,
-            stack: error.stack
-        });
-    }
-});
 
 // Alternative connection test with different options
-app.get('/api/test-connection-alt', async (req, res) => {
-    try {
-        console.log('🧪 Testing alternative connection method...');
-        
-        // Try with minimal options
-        const altOptions = {
-            serverSelectionTimeoutMS: 10000,
-            connectTimeoutMS: 10000,
-            socketTimeoutMS: 10000,
-        };
-        
-        // Create a separate connection for testing
-        const testConnection = await mongoose.createConnection(process.env.MONGODB_URI, altOptions);
-        
-        // Test the connection
-        const isConnected = testConnection.readyState === 1;
-        
-        if (isConnected) {
-            const ping = await testConnection.db.admin().ping();
-            await testConnection.close();
-            
-            res.json({
-                success: true,
-                message: 'Alternative connection successful',
-                pingResult: ping
-            });
-        } else {
-            await testConnection.close();
-            res.status(500).json({
-                success: false,
-                message: 'Alternative connection failed',
-                readyState: testConnection.readyState
-            });
-        }
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Alternative connection test failed',
-            error: error.message
-        });
-    }
-});
 
 // API Check if username exists (alternative to /check-username)
 app.post('/api/check-username', async (req, res) => {
-    console.log('POST /api/check-username triggered with:', req.body);
     res.header('Access-Control-Allow-Origin', '*');
     
     try {
@@ -269,7 +128,6 @@ app.post('/api/check-username', async (req, res) => {
         while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
             await new Promise(resolve => setTimeout(resolve, 500));
             attempts++;
-            console.log(`Waiting for DB context in api/check-username... Attempt ${attempts}`);
         }
         
         if (!mongoose.connection.db) {
@@ -285,10 +143,8 @@ app.post('/api/check-username', async (req, res) => {
         }
 
         const username = req.body.username.trim();
-        console.log('✅ API Checking username:', username, 'in database:', mongoose.connection.db.databaseName);
 
         const existingUser = await User.findOne({ username });
-        console.log('Database query result:', existingUser ? 'User exists' : 'Username available');
         
         return res.status(200).json({
             exists: !!existingUser,
@@ -324,19 +180,14 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
         while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
             await new Promise(resolve => setTimeout(resolve, 500));
             attempts++;
-            console.log(`Waiting for DB context in api/registration... Attempt ${attempts}`);
         }
         
         if (!mongoose.connection.db) {
             throw new Error('Database context not available for registration');
         }
         
-        console.log('✅ API Database context ready for registration');
-        console.log('Request body:', req.body);
         if (req.file) {
-            console.log('Profile picture uploaded:', req.file.filename);
         } else {
-            console.log('No profile picture uploaded');
         }
 
         if (!req.body.username || !req.body.password || !req.body.passkey) {
@@ -350,29 +201,24 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
         const { username, password, passkey } = req.body;
         const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
 
-        console.log(`🔍 API Checking for existing user: ${username} in database: ${mongoose.connection.db.databaseName}`);
         
         // Check for existing user again
         const existingUser = await User.findOne({ username });
         if (existingUser) {
-            console.log('Username already exists:', username);
             return res.status(400).json({ 
                 success: false, 
                 message: 'Username already exists' 
             });
         }
 
-        console.log('✅ API Username available, proceeding with registration');
 
         // Generate RSA key pair
         const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
         
         // Encrypt private key with passkey
-        console.log('Encrypting private key with passkey...');
         const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
 
         // Hash password
-        console.log('Hashing password...');
         const hashedPassword = await bcrypt.hash(password, 10);
         
         // Create new user
@@ -385,9 +231,7 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
             profilePicture
         });
 
-        console.log('Saving user to database...');
         await user.save();
-        console.log('✅ API User created successfully:', username);
 
         res.status(201).json({ 
             success: true, 
@@ -408,191 +252,8 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
 });
 
 // Simple registration test endpoint (no file upload)
-app.post('/api/test-registration', async (req, res) => {
-    try {
-        console.log('🧪 Test registration endpoint called');
-        
-        // Ensure MongoDB connection
-        await connectToDatabase();
-        
-        // Wait for database context to be ready
-        let attempts = 0;
-        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            attempts++;
-            console.log(`Waiting for DB context in test registration... Attempt ${attempts}`);
-        }
-        
-        if (!mongoose.connection.db) {
-            throw new Error('Database context not available for test registration');
-        }
-        
-        console.log('✅ Database context ready for test registration');
-        
-        const { username, password, passkey } = req.body;
-        
-        if (!username || !password || !passkey) {
-            return res.status(400).json({
-                success: false,
-                message: 'All fields are required',
-                provided: { username: !!username, password: !!password, passkey: !!passkey }
-            });
-        }
-        
-        console.log(`🔍 Test: Checking for existing user: ${username}`);
-        
-        // Check for existing user
-        const existingUser = await User.findOne({ username });
-        if (existingUser) {
-            console.log('❌ Test: Username already exists:', username);
-            return res.status(400).json({
-                success: false,
-                message: 'Username already exists',
-                debug: { database: mongoose.connection.db.databaseName }
-            });
-        }
-        
-        console.log('✅ Test: Username available, creating user...');
-        
-        // Generate RSA key pair
-        console.log('🔑 Test: Generating RSA keys...');
-        const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
-        
-        // Encrypt private key with passkey
-        console.log('🔐 Test: Encrypting private key...');
-        const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
-        
-        // Hash password
-        console.log('🔒 Test: Hashing password...');
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        // Create new user
-        console.log('👤 Test: Creating user document...');
-        const newUser = new User({
-            username,
-            password: hashedPassword,
-            passkey,
-            publicKey,
-            encryptedPrivateKey,
-            profilePicture: 'resources/Default.jpg'
-        });
-        
-        console.log('💾 Test: Saving user to database...');
-        const savedUser = await newUser.save();
-        console.log('✅ Test: User saved successfully with ID:', savedUser._id);
-        
-        // Verify user was saved
-        const userCount = await User.countDocuments();
-        console.log('📊 Test: Total users in database:', userCount);
-        
-        res.json({
-            success: true,
-            message: 'Test registration successful',
-            debug: {
-                userId: savedUser._id,
-                database: mongoose.connection.db.databaseName,
-                totalUsers: userCount,
-                steps: [
-                    '✅ Connection established',
-                    '✅ Database context ready', 
-                    '✅ Username available',
-                    '✅ RSA keys generated',
-                    '✅ Private key encrypted',
-                    '✅ Password hashed',
-                    '✅ User document created',
-                    '✅ User saved to database'
-                ]
-            }
-        });
-        
-    } catch (error) {
-        console.error('❌ Test registration error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Test registration failed',
-            error: error.message,
-            stack: error.stack,
-            debug: {
-                database: mongoose.connection.db?.databaseName,
-                readyState: mongoose.connection.readyState
-            }
-        });
-    }
-});
 
 // Test registration with database debugging
-app.post('/api/register-debug', async (req, res) => {
-    try {
-        await connectToDatabase();
-        
-        const { username, password, passkey } = req.body;
-        
-        if (!username || !password || !passkey) {
-            return res.status(400).json({
-                success: false,
-                message: 'All fields required',
-                debug: { username: !!username, password: !!password, passkey: !!passkey }
-            });
-        }
-        
-        console.log(`🔍 Debug Registration - Username: ${username}`);
-        console.log(`🔍 Current Database: ${mongoose.connection.db.databaseName}`);
-        
-        // Check current database for existing user
-        const existingUser = await User.findOne({ username });
-        console.log(`🔍 Existing user found: ${!!existingUser}`);
-        
-        if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: 'User already exists in current database',
-                debug: {
-                    database: mongoose.connection.db.databaseName,
-                    existingUser: true
-                }
-            });
-        }
-        
-        // Try to create user
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
-        const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
-        
-        const newUser = new User({
-            username,
-            password: hashedPassword,
-            passkey,
-            publicKey,
-            encryptedPrivateKey,
-            profilePicture: 'resources/Default.jpg'
-        });
-        
-        const savedUser = await newUser.save();
-        console.log(`✅ User created with ID: ${savedUser._id}`);
-        
-        res.json({
-            success: true,
-            message: 'User registered successfully',
-            debug: {
-                database: mongoose.connection.db.databaseName,
-                userId: savedUser._id,
-                collections: await mongoose.connection.db.listCollections().toArray()
-            }
-        });
-        
-    } catch (error) {
-        console.error('Registration debug error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Registration failed',
-            error: error.message,
-            debug: {
-                database: mongoose.connection.db?.databaseName,
-                readyState: mongoose.connection.readyState
-            }
-        });
-    }
-});
 
 // Database inspection endpoint
 app.get('/api/db-inspect', async (req, res) => {
@@ -604,7 +265,6 @@ app.get('/api/db-inspect', async (req, res) => {
         while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
             await new Promise(resolve => setTimeout(resolve, 500));
             attempts++;
-            console.log(`Waiting for DB context... Attempt ${attempts}`);
         }
         
         if (!mongoose.connection.db) {
@@ -623,7 +283,6 @@ app.get('/api/db-inspect', async (req, res) => {
                 sizeOnDisk: db.sizeOnDisk
             }));
         } catch (adminError) {
-            console.log('Admin access not available:', adminError.message);
             databases = [{ name: db.databaseName, note: 'Current DB only - admin access limited' }];
         }
         
@@ -640,7 +299,6 @@ app.get('/api/db-inspect', async (req, res) => {
         try {
             sampleUser = await usersCollection.findOne({}, { projection: { username: 1, _id: 1 } });
         } catch (err) {
-            console.log('Sample user query failed:', err.message);
         }
         
         res.json({
@@ -669,29 +327,6 @@ app.get('/api/db-inspect', async (req, res) => {
 });
 
 // Environment debug endpoint
-app.get('/api/env-debug', (req, res) => {
-    const envInfo = {
-        nodeEnv: process.env.NODE_ENV,
-        port: process.env.PORT,
-        mongoUriExists: !!process.env.MONGODB_URI,
-        mongoUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
-        mongoUriPreview: process.env.MONGODB_URI ? 
-            process.env.MONGODB_URI.substring(0, 20) + '...' + process.env.MONGODB_URI.substring(process.env.MONGODB_URI.length - 20) 
-            : 'NOT SET',
-        allEnvKeys: Object.keys(process.env).filter(key => 
-            key.includes('MONGO') || 
-            key.includes('DB') || 
-            key.includes('DATABASE') ||
-            key.includes('URI')
-        ),
-        vercelEnv: process.env.VERCEL,
-        vercelUrl: process.env.VERCEL_URL,
-        processEnvKeys: Object.keys(process.env).length,
-        timestamp: new Date().toISOString()
-    };
-    
-    res.json(envInfo);
-});
 
 // User Schema
 const UserSchema = new mongoose.Schema({
@@ -711,13 +346,11 @@ const storage = multer.diskStorage({
         const uploadPath = path.join(__dirname, 'uploads');
         if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
-            console.log('Uploads folder created at:', uploadPath);
         }
         cb(null, uploadPath);
     },
     filename: function (req, file, cb) {
         const outName = Date.now() + path.extname(file.originalname);
-        console.log('Storing uploaded file as:', outName);
         cb(null, outName);
     }
 });
@@ -824,11 +457,9 @@ class EncryptionUtils {
 
 // Get user's public key
 app.get('/api/user/:username/public-key', async (req, res) => {
-    console.log('GET /api/user/:username/public-key triggered for username:', req.params.username);
     try {
         const user = await User.findOne({ username: req.params.username });
         if (!user) {
-            console.log('User not found:', req.params.username);
             return res.status(404).json({ success: false, message: 'User not found' });
         }
         
@@ -841,10 +472,8 @@ app.get('/api/user/:username/public-key', async (req, res) => {
             user.publicKey = publicKey;
             user.encryptedPrivateKey = encryptedPrivateKey;
             await user.save();
-            console.log('RSA keys generated and saved for user:', req.params.username);
         }
         
-        console.log('Returning public key for:', req.params.username);
         res.json({ success: true, publicKey: user.publicKey });
     } catch (error) {
         console.error('Error fetching public key:', error);
@@ -854,7 +483,6 @@ app.get('/api/user/:username/public-key', async (req, res) => {
 
 // Generate RSA keys for existing users
 app.post('/api/user/:username/generate-keys', async (req, res) => {
-    console.log('POST /api/user/:username/generate-keys triggered for username:', req.params.username);
     try {
         const { passkey } = req.body;
         if (!passkey) {
@@ -863,7 +491,6 @@ app.post('/api/user/:username/generate-keys', async (req, res) => {
         
         const user = await User.findOne({ username: req.params.username });
         if (!user) {
-            console.log('User not found:', req.params.username);
             return res.status(404).json({ success: false, message: 'User not found' });
         }
         
@@ -873,7 +500,6 @@ app.post('/api/user/:username/generate-keys', async (req, res) => {
         }
         
         // Generate RSA keys
-        console.log('Generating RSA keys for existing user:', req.params.username);
         const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
         const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
         
@@ -881,7 +507,6 @@ app.post('/api/user/:username/generate-keys', async (req, res) => {
         user.encryptedPrivateKey = encryptedPrivateKey;
         await user.save();
         
-        console.log('RSA keys generated and saved for existing user:', req.params.username);
         res.json({ success: true, message: 'RSA keys generated successfully' });
     } catch (error) {
         console.error('Error generating RSA keys:', error);
@@ -891,14 +516,11 @@ app.post('/api/user/:username/generate-keys', async (req, res) => {
 
 // Get user profile
 app.get('/api/user/:username/profile-picture', async (req, res) => {
-    console.log('GET /api/user/:username/profile-picture triggered for username:', req.params.username);
     try {
         const user = await User.findOne({ username: req.params.username });
         if (!user) {
-            console.log('User not found:', req.params.username);
             return res.status(404).json({ success: false, message: 'User not found' });
         }
-        console.log('Returning profile picture for:', req.params.username);
         res.json({ success: true, profilePicture: user.profilePicture });
     } catch (error) {
         console.error('Error fetching profile picture:', error);
@@ -911,7 +533,6 @@ app.get('/api/contacts', async (req, res) => {
 
     try {
         const users = await User.find({}, { username: 1, profilePicture: 1, _id: 0 });
-        console.log('Contacts found:', users.length);
         res.json(users);
     } catch (error) {
         console.error('Error fetching contacts:', error);
@@ -921,7 +542,6 @@ app.get('/api/contacts', async (req, res) => {
 
 // Get chat history
 app.get('/api/messages/:user1/:user2', async (req, res) => {
-    console.log('GET /api/messages/:user1/:user2 triggered. Users:', req.params.user1, 'and', req.params.user2);
     try {
         const messages = await Message.find({
             $or: [
@@ -929,7 +549,6 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
                 { sender: req.params.user2, receiver: req.params.user1 }
             ]
         }).sort('timestamp');
-        console.log('Chat history length:', messages.length);
         res.json(messages);
     } catch (error) {
         console.error('Error fetching messages:', error);
@@ -939,7 +558,6 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
 
 // Send encrypted message
 app.post('/api/messages/send-encrypted', async (req, res) => {
-    console.log('POST /api/messages/send-encrypted triggered with body:', req.body);
     try {
         const { sender, receiver, message } = req.body;
         
@@ -969,7 +587,6 @@ app.post('/api/messages/send-encrypted', async (req, res) => {
             originalText: message       // <–– store the plaintext
         });
         await newMessage.save();
-        console.log('Encrypted message saved:', newMessage);
         res.status(201).json({ success: true, message: 'Encrypted message sent successfully' });
     } catch (error) {
         console.error('Error sending encrypted message:', error);
@@ -979,7 +596,6 @@ app.post('/api/messages/send-encrypted', async (req, res) => {
 
 // Decrypt message
 app.post('/api/messages/decrypt', async (req, res) => {
-    console.log('POST /api/messages/decrypt triggered with body:', req.body);
     try {
         const { messageId, username, passkey } = req.body;
         
@@ -1014,7 +630,6 @@ app.post('/api/messages/decrypt', async (req, res) => {
 
 // Send message
 app.post('/api/messages/send', async (req, res) => {
-    console.log('POST /api/messages/send triggered with body:', req.body);
     try {
         const { sender, receiver, content, type } = req.body;
         const message = new Message({
@@ -1024,7 +639,6 @@ app.post('/api/messages/send', async (req, res) => {
             type
         });
         await message.save();
-        console.log('Message saved:', message);
         res.status(201).json({ success: true, message: 'Message sent successfully' });
     } catch (error) {
         console.error('Error sending message', error);
@@ -1036,7 +650,6 @@ app.post('/api/messages/send', async (req, res) => {
 const stegoUploadDir = path.join(__dirname, 'uploads', 'stego');
 if (!fs.existsSync(stegoUploadDir)) {
     fs.mkdirSync(stegoUploadDir, { recursive: true });
-    console.log('Created stego uploads directory at:', stegoUploadDir);
 }
 
 // Steganography endpoint
@@ -1050,13 +663,10 @@ app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
     }
 
     try {
-        console.log('Processing steganography request...');
         const image = await jimp.read(req.file.path);
         const message = req.body.message;
         const bits = parseInt(req.body.bits) || 4;
 
-        console.log('Image loaded, dimensions:', image.getWidth(), 'x', image.getHeight());
-        console.log('Message length:', message.length);
 
         // Validate capacity
         const capacity = Math.floor((image.getWidth() * image.getHeight() * 3 * bits) / 8);
@@ -1073,15 +683,12 @@ app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
         
         // Save the processed image
         await stegoImage.writeAsync(outputPath);
-        console.log('Stego image saved at:', outputPath);
         
         // Clean up original uploaded file
         fs.unlinkSync(req.file.path);
-        console.log('Original file cleaned up');
 
         // Return the URL that can be used to access the image
         const imageUrl = `/uploads/stego/${outputFilename}`;
-        console.log('Returning image URL:', imageUrl);
 
         res.json({
             success: true,
@@ -1118,7 +725,6 @@ app.post('/api/messages/stego/send', upload.single('image'), async (req, res) =>
         const { message, sender, receiver } = req.body;
         const bits = parseInt(req.body.bits) || 4;
 
-        console.log('Processing RSA-AES steganography request...');
         
         // Get receiver's public key
         const receiverUser = await User.findOne({ username: receiver });
@@ -1146,7 +752,6 @@ app.post('/api/messages/stego/send', upload.single('image'), async (req, res) =>
 
         // Load and process image
         const image = await jimp.read(req.file.path);
-        console.log('Image loaded, dimensions:', image.getWidth(), 'x', image.getHeight());
 
         // Validate capacity
         const capacity = Math.floor((image.getWidth() * image.getHeight() * 3 * bits) / 8);
@@ -1163,7 +768,6 @@ app.post('/api/messages/stego/send', upload.single('image'), async (req, res) =>
         
         // Save the processed image
         await stegoImage.writeAsync(outputPath);
-        console.log('Stego image with encrypted payload saved at:', outputPath);
         
         // Clean up original uploaded file
         fs.unlinkSync(req.file.path);
@@ -1230,7 +834,6 @@ app.post('/api/messages/stego/decrypt', async (req, res) => {
         }
 
         const image = await jimp.read(imagePath);
-        console.log('Image loaded for steganography decryption');
 
         // Extract payload from image
         const extractedPayload = await extractMessageFromImage(image, 4);
@@ -1271,12 +874,10 @@ app.post('/api/messages/stego/extract', upload.single('image'), async (req, res)
 
     try {
         const image = await jimp.read(req.file.path);
-        console.log('Image loaded for extraction:', req.file.path);
         const extractedMessage = await extractMessageFromImage(image, bits);
 
         // Clean up uploaded file
         fs.unlinkSync(req.file.path);
-        console.log('Removed uploaded file post-extraction:', req.file.path);
 
         res.json({
             success: true,
@@ -1288,7 +889,6 @@ app.post('/api/messages/stego/extract', upload.single('image'), async (req, res)
         // Clean up file on error
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
-            console.log('Cleaned up file after extraction error:', req.file.path);
         }
 
         res.status(500).json({
@@ -1304,7 +904,6 @@ const testUploadDir = () => {
     
     // Check if directory exists
     if (!fs.existsSync(uploadDir)) {
-        console.log('Creating uploads directory...');
         fs.mkdirSync(uploadDir, { recursive: true });
     }
 
@@ -1313,7 +912,6 @@ const testUploadDir = () => {
         const testFile = path.join(uploadDir, 'test-permissions.txt');
         fs.writeFileSync(testFile, 'test');
         fs.unlinkSync(testFile);
-        console.log('✓ Upload directory permissions verified');
     } catch (error) {
         console.error('❌ Upload directory permission error:', error);
         process.exit(1);
@@ -1331,7 +929,6 @@ const testUploadDir = () => {
             .then(res => {
                 fs.unlinkSync(testFile);
                 if (res.ok) {
-                    console.log('✓ Static file serving verified');
                     resolve(true);
                 } else {
                     console.error('❌ Static serving not working');
@@ -1350,7 +947,6 @@ const testUploadDir = () => {
 
 // Embed message into image
 async function embedMessageInImage(image, message, bits) {
-    console.log('Starting embedMessageInImage');
     try {
         const messageWithMeta = `${message.length}%%%${message}`;
         const binaryMessage = Buffer.from(messageWithMeta, 'utf8')
@@ -1363,8 +959,6 @@ async function embedMessageInImage(image, message, bits) {
         const height = image.getHeight();
         const totalChannels = width * height * 3 * bits;
 
-        console.log('Message binary length:', binaryMessage.length);
-        console.log('Available capacity:', totalChannels);
 
         if (binaryMessage.length > totalChannels) {
             throw new Error('Message too large for image capacity');
@@ -1391,7 +985,6 @@ async function embedMessageInImage(image, message, bits) {
             }
         }
 
-        console.log('Message embedded successfully');
         return image;
     } catch (error) {
         console.error('Error in embedMessageInImage:', error);
@@ -1401,7 +994,6 @@ async function embedMessageInImage(image, message, bits) {
 
 // Extract message from image
 async function extractMessageFromImage(image, bits) {
-    console.log('extractMessageFromImage called');
     try {
         const width = image.getWidth();
         const height = image.getHeight();
@@ -1444,18 +1036,15 @@ async function extractMessageFromImage(image, bits) {
 
 // Verify user's passkey
 app.post('/api/verify-passkey', async (req, res) => {
-    console.log('POST /api/verify-passkey triggered:', req.body);
     try {
         const { username, passkey } = req.body;
         const user = await User.findOne({ username });
 
         if (!user) {
-            console.log('User not found for verify-passkey:', username);
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
         const isValid = user.passkey === passkey;
-        console.log('Passkey valid:', isValid);
         res.json({ success: isValid });
     } catch (error) {
         console.error('Error verifying passkey:', error);
@@ -1483,7 +1072,6 @@ app.use('/uploads/stego', express.static(path.join(__dirname, 'uploads', 'stego'
 
 // Debug resources access
 app.use('/resources', (req, res, next) => {
-    console.log('Resource requested:', req.url);
     next();
 });
 
@@ -1510,13 +1098,11 @@ app.post('/uploadProfilePicture', upload.single('profilePicture'), (req, res) =>
     }
 
     const profilePicturePath = '/uploads/' + req.file.filename;
-    console.log('Profile picture saved to:', profilePicturePath);
     res.json({ success: true, filePath: profilePicturePath });
 });
 
 // Check if username exists
 app.post('/check-username', async (req, res) => {
-    console.log('POST /check-username triggered with:', req.body);
     res.header('Access-Control-Allow-Origin', '*');
     
     try {
@@ -1528,7 +1114,6 @@ app.post('/check-username', async (req, res) => {
         while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
             await new Promise(resolve => setTimeout(resolve, 500));
             attempts++;
-            console.log(`Waiting for DB context in check-username... Attempt ${attempts}`);
         }
         
         if (!mongoose.connection.db) {
@@ -1544,10 +1129,8 @@ app.post('/check-username', async (req, res) => {
         }
 
         const username = req.body.username.trim();
-        console.log('✅ Checking username:', username, 'in database:', mongoose.connection.db.databaseName);
 
         const existingUser = await User.findOne({ username });
-        console.log('Database query result:', existingUser ? 'User exists' : 'Username available');
         
         return res.status(200).json({
             exists: !!existingUser,
@@ -1583,19 +1166,14 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
         while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
             await new Promise(resolve => setTimeout(resolve, 500));
             attempts++;
-            console.log(`Waiting for DB context in registration... Attempt ${attempts}`);
         }
         
         if (!mongoose.connection.db) {
             throw new Error('Database context not available for registration');
         }
         
-        console.log('✅ Database context ready for registration');
-        console.log('Request body:', req.body);
         if (req.file) {
-            console.log('Profile picture uploaded:', req.file.filename);
         } else {
-            console.log('No profile picture uploaded');
         }
 
         if (!req.body.username || !req.body.password || !req.body.passkey) {
@@ -1609,34 +1187,28 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
         const { username, password, passkey } = req.body;
         const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
 
-        console.log(`🔍 Checking for existing user: ${username} in database: ${mongoose.connection.db.databaseName}`);
         
         // Check for existing user again
         const existingUser = await User.findOne({ username });
         if (existingUser) {
-            console.log('Username already exists:', username);
             return res.status(400).json({ 
                 success: false, 
                 message: 'Username already exists' 
             });
         }
 
-        console.log('✅ Username available, proceeding with registration');
 
         // Generate RSA key pair
 
         const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
         
         // Encrypt private key with passkey
-        console.log('Encrypting private key with passkey...');
         const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
 
         // Hash password
-        console.log('Hashing password...');
         const hashedPassword = await bcrypt.hash(password, 10);
         
         // Create and save user
-        console.log('Creating new user...');
         const newUser = new User({
             username,
             password: hashedPassword,
@@ -1647,7 +1219,6 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
         });
 
         await newUser.save();
-        console.log('User registered and saved to DB:', {
             username: newUser.username,
             passkey: newUser.passkey,
             profilePicture: newUser.profilePicture,
@@ -1675,19 +1246,16 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
 
 // Complete registration
 app.post('/complete-registration', upload.single('profilePicture'), async (req, res) => {
-    console.log('POST /complete-registration triggered with body:', req.body);
     const { username, password, passkey } = req.body;
     const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
 
     if (!username || !password || !passkey) {
-        console.log('Missing fields on complete-registration');
         return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
     try {
         const existingUser = await User.findOne({ username });
         if (existingUser) {
-            console.log('Username already exists on complete-registration:', username);
             return res.status(400).json({ success: false, message: 'Username already exists.' });
         }
 
@@ -1696,7 +1264,6 @@ app.post('/complete-registration', upload.single('profilePicture'), async (req, 
         const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
         
         // Encrypt private key with passkey
-        console.log('Encrypting private key with passkey for complete-registration...');
         const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -1710,7 +1277,6 @@ app.post('/complete-registration', upload.single('profilePicture'), async (req, 
         });
 
         await newUser.save();
-        console.log('User registered successfully via complete-registration:', username);
         res.status(201).json({ success: true, message: 'User registered successfully' });
     } catch (err) {
         console.error('Error during complete-registration:', err);
@@ -1724,13 +1290,11 @@ app.post('/login', async (req, res) => {
         // Ensure MongoDB connection
         await connectToDatabase();
         
-        console.log('POST /login triggered with body:', {
             username: req.body.username,
             passwordProvided: !!req.body.password
         });
         
         if (!req.body.username || !req.body.password) {
-            console.log('Missing username or password');
             return res.status(400).json({ 
                 success: false,
                 message: 'Username and password are required' 
@@ -1739,11 +1303,9 @@ app.post('/login', async (req, res) => {
         
         const { username, password } = req.body;
 
-        console.log('Looking up user in database:', username);
         let user = await User.findOne({ username });
         
         if (!user) {
-            console.log('User not found in database:', username);
             return res.status(400).json({ 
                 success: false,
                 message: 'Invalid credentials' 
@@ -1754,14 +1316,12 @@ app.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         
         if (!isMatch) {
-            console.log('Password does not match');
             return res.status(400).json({ 
                 success: false,
                 message: 'Invalid credentials' 
             });
         }
 
-        console.log('Login successful for user:', username);
         return res.status(200).json({ 
             success: true,
             message: 'Login successful',
@@ -1778,26 +1338,13 @@ app.post('/login', async (req, res) => {
 });
 
 // Add a test route
-app.get('/test', (req, res) => {
-
-    res.json({ message: 'Server is reachable' });
-});
 
 // Add a debug route
-app.get('/debug', (req, res) => {
-
-    res.sendFile(path.join(__dirname, '..', 'debug.html'));
-});
 
 // Add a connection test page
-app.get('/connection-test', (req, res) => {
-
-    res.sendFile(path.join(__dirname, '..', 'connection-test.html'));
-});
 
 // API connectivity test endpoint
 app.get('/api/connection-test', (req, res) => {
-    console.log('Connection test requested from:', req.get('origin'));
     res.json({
         success: true,
         message: 'Server connection successful',
@@ -1839,7 +1386,6 @@ app.post('/api/auth/verify-password', async (req, res) => {
 
 // Fallback route - MUST BE LAST
 app.get('*', (req, res) => {
-    console.log('Fallback route triggered, serving index.html');
     res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
@@ -1850,7 +1396,10 @@ module.exports = app;
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, async () => {
-        console.log(`Server running at http://localhost:${PORT}`);
         await testUploadDir();
     });
 }
+
+
+
+
