@@ -4,12 +4,92 @@
     {
       "src": "server/server.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "style.css",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "script.js", 
+      "use": "@vercel/static"
+    },
+    {
+      "src": "contacts.css",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "contacts.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "contacts.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "resources/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "server/server.js"
+    },
+    {
+      "src": "/uploads/(.*)",
+      "dest": "server/server.js"
+    },
+    {
+      "src": "/check-username",
+      "dest": "server/server.js"
+    },
+    {
+      "src": "/register",
+      "dest": "server/server.js"
+    },
+    {
+      "src": "/login",
+      "dest": "server/server.js"
+    },
+    {
+      "src": "/uploadProfilePicture",
+      "dest": "server/server.js"
+    },
+    {
+      "src": "/steganography",
+      "dest": "server/server.js"
+    },
+    {
+      "src": "/style.css",
+      "dest": "/style.css"
+    },
+    {
+      "src": "/script.js",
+      "dest": "/script.js"
+    },
+    {
+      "src": "/contacts.css",
+      "dest": "/contacts.css"
+    },
+    {
+      "src": "/contacts.js",
+      "dest": "/contacts.js"
+    },
+    {
+      "src": "/resources/(.*)",
+      "dest": "/resources/$1"
+    },
+    {
+      "src": "/contacts.html",
+      "dest": "/contacts.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "env": {
