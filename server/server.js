@@ -1125,6 +1125,25 @@ app.get('/debug', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'debug.html'));
 });
 
+// Add a connection test page
+app.get('/connection-test', (req, res) => {
+    console.log('GET /connection-test route triggered');
+    res.sendFile(path.join(__dirname, '..', 'connection-test.html'));
+});
+
+// API connectivity test endpoint
+app.get('/api/connection-test', (req, res) => {
+    console.log('Connection test requested from:', req.get('origin'));
+    res.json({
+        success: true,
+        message: 'Server connection successful',
+        timestamp: new Date().toISOString(),
+        origin: req.get('origin'),
+        host: req.get('host'),
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
 // Fallback route
 app.get('*', (req, res) => {
     console.log('Fallback route triggered, serving index.html');
