@@ -866,8 +866,16 @@ app.use('/resources', (req, res, next) => {
 // Explicitly serve resources directory
 app.use('/resources', express.static(path.join(__dirname, '..', 'resources')));
 
-// Serve static files from the root directory
-app.use(express.static(path.join(__dirname, '..')));
+// Serve static files from the root directory with proper MIME types
+app.use(express.static(path.join(__dirname, '..'), {
+    setHeaders: (res, path, stat) => {
+        if (path.endsWith('.css')) {
+            res.set('Content-Type', 'text/css');
+        } else if (path.endsWith('.js')) {
+            res.set('Content-Type', 'application/javascript');
+        }
+    }
+}));
 
 // Profile Picture Upload Route
 app.post('/uploadProfilePicture', upload.single('profilePicture'), (req, res) => {
