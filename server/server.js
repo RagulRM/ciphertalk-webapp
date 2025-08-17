@@ -334,11 +334,33 @@ app.get('/api/db-inspect', async (req, res) => {
     try {
         await connectToDatabase();
         
-        const db = mongoose.connection.db;
-        const admin = db.admin();
+        // Wait for connection to fully establish
+        let attempts = 0;
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+            console.log(`Waiting for DB context... Attempt ${attempts}`);
+        }
         
-        // List all databases
-        const databases = await admin.listDatabases();
+        if (!mongoose.connection.db) {
+            throw new Error('Database context not available after connection');
+        }
+        
+        const db = mongoose.connection.db;
+        
+        // List all databases (this might not work in serverless, so wrap in try-catch)
+        let databases = [];
+        try {
+            const admin = db.admin();
+            const dbList = await admin.listDatabases();
+            databases = dbList.databases.map(db => ({
+                name: db.name,
+                sizeOnDisk: db.sizeOnDisk
+            }));
+        } catch (adminError) {
+            console.log('Admin access not available:', adminError.message);
+            databases = [{ name: db.databaseName, note: 'Current DB only - admin access limited' }];
+        }
         
         // Get current database info
         const currentDb = db.databaseName;
@@ -348,23 +370,35 @@ app.get('/api/db-inspect', async (req, res) => {
         const usersCollection = db.collection('users');
         const userCount = await usersCollection.countDocuments();
         
+        // Try to find a sample user
+        let sampleUser = null;
+        try {
+            sampleUser = await usersCollection.findOne({}, { projection: { username: 1, _id: 1 } });
+        } catch (err) {
+            console.log('Sample user query failed:', err.message);
+        }
+        
         res.json({
             success: true,
             currentDatabase: currentDb,
-            allDatabases: databases.databases.map(db => ({
-                name: db.name,
-                sizeOnDisk: db.sizeOnDisk
-            })),
+            allDatabases: databases,
             collectionsInCurrentDb: collections.map(col => col.name),
             usersInCurrentDb: userCount,
-            connectionString: process.env.MONGODB_URI.replace(/:[^:@]*@/, ':***@') // Hide password
+            sampleUser: sampleUser,
+            connectionString: process.env.MONGODB_URI.replace(/:[^:@]*@/, ':***@'), // Hide password
+            readyState: mongoose.connection.readyState,
+            host: mongoose.connection.host,
+            port: mongoose.connection.port
         });
         
     } catch (error) {
+        console.error('DB inspect error:', error);
         res.status(500).json({
             success: false,
             error: error.message,
-            stack: error.stack
+            stack: error.stack,
+            readyState: mongoose.connection.readyState,
+            dbExists: !!mongoose.connection.db
         });
     }
 });
@@ -1255,6 +1289,19 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
         // Ensure MongoDB connection
         await connectToDatabase();
         
+        // Wait for database context to be ready
+        let attempts = 0;
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+            console.log(`Waiting for DB context in registration... Attempt ${attempts}`);
+        }
+        
+        if (!mongoose.connection.db) {
+            throw new Error('Database context not available for registration');
+        }
+        
+        console.log('✅ Database context ready for registration');
         console.log('Request body:', req.body);
         if (req.file) {
             console.log('Profile picture uploaded:', req.file.filename);
@@ -1273,6 +1320,8 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
         const { username, password, passkey } = req.body;
         const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
 
+        console.log(`🔍 Checking for existing user: ${username} in database: ${mongoose.connection.db.databaseName}`);
+        
         // Check for existing user again
         const existingUser = await User.findOne({ username });
         if (existingUser) {
@@ -1282,6 +1331,8 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
                 message: 'Username already exists' 
             });
         }
+
+        console.log('✅ Username available, proceeding with registration');
 
         // Generate RSA key pair
 
