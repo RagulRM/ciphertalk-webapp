@@ -19,7 +19,8 @@ const allowedOrigins = [
     'http://localhost:5500', 
     'http://127.0.0.1:5500', 
     'http://localhost:3000', 
-    'http://127.0.0.1:3000'
+    'http://127.0.0.1:3000',
+    'https://ciphertalk.dev'
 ];
 
 // Add production domains
@@ -1465,7 +1466,20 @@ app.get('/api/connection-test', (req, res) => {
         timestamp: new Date().toISOString(),
         origin: req.get('origin'),
         host: req.get('host'),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
+        vercel: !!process.env.VERCEL,
+        mongoConnected: mongoose.connection.readyState === 1,
+        corsOrigins: allowedOrigins
+    });
+});
+
+// Production health check
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        environment: process.env.NODE_ENV,
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -1507,7 +1521,7 @@ app.get('*', (req, res) => {
 module.exports = app;
 
 // Only start server locally (not in Vercel)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+if (!process.env.VERCEL) {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, async () => {
         console.log(`🚀 Server is running on port ${PORT}`);
@@ -1517,6 +1531,6 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     });
 } else {
     console.log('🌐 Running in Vercel serverless mode');
-    // In production, ensure upload directories exist
+    // In production, ensure upload directories exist when the module loads
     testUploadDir().catch(err => console.error('Upload dir test failed:', err));
 }
