@@ -62,13 +62,14 @@ const resourcesDir = path.join(__dirname, '..', 'resources');
 
 // Connect to MongoDB Atlas with proper serverless options
 const mongoOptions = {
-    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+    serverSelectionTimeoutMS: 30000, // Increase timeout to 30s for initial connection
     socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
-    maxPoolSize: 10, // Maintain up to 10 socket connections
+    maxPoolSize: 1, // Reduce pool size for serverless
     bufferCommands: false, // Disable mongoose buffering
     bufferMaxEntries: 0, // Disable mongoose buffering
     useUnifiedTopology: true,
     useNewUrlParser: true,
+    maxIdleTimeMS: 30000,
     serverApi: {
         version: '1',
         strict: true,
@@ -78,29 +79,29 @@ const mongoOptions = {
 
 console.log('MongoDB URI:', process.env.MONGODB_URI ? 'SET (length: ' + process.env.MONGODB_URI.length + ')' : 'NOT SET');
 
-// Try to connect with retry logic
-const connectWithRetry = () => {
-    return mongoose.connect(process.env.MONGODB_URI, mongoOptions)
-        .then(() => {
-            console.log('✅ Connected to MongoDB Database successfully');
-        })
-        .catch((err) => {
-            console.error('❌ Failed to connect to MongoDB Database:', err.message);
-            console.error('Connection string format check:', {
-                hasUsername: process.env.MONGODB_URI?.includes('Ragul'),
-                hasPassword: process.env.MONGODB_URI?.includes('RagulCipher'),
-                hasDatabase: process.env.MONGODB_URI?.includes('ciphertalk'),
-                hasCluster: process.env.MONGODB_URI?.includes('useridcluster')
-            });
-            
-            // Retry connection after 5 seconds
-            console.log('⏳ Retrying MongoDB connection in 5 seconds...');
-            setTimeout(connectWithRetry, 5000);
-        });
+// Connection promise for serverless
+let cachedConnection = null;
+
+const connectToDatabase = async () => {
+    if (cachedConnection && mongoose.connection.readyState === 1) {
+        return cachedConnection;
+    }
+
+    try {
+        console.log('🔄 Attempting MongoDB connection...');
+        cachedConnection = await mongoose.connect(process.env.MONGODB_URI, mongoOptions);
+        console.log('✅ Connected to MongoDB Database successfully');
+        return cachedConnection;
+    } catch (error) {
+        console.error('❌ Failed to connect to MongoDB Database:', error.message);
+        throw error;
+    }
 };
 
-// Start initial connection
-connectWithRetry();
+// Start initial connection attempt (non-blocking)
+connectToDatabase().catch(err => {
+    console.error('Initial connection failed:', err.message);
+});
 
 // Debug endpoint to check MongoDB connection and environment
 app.get('/api/debug', async (req, res) => {
@@ -129,7 +130,7 @@ app.get('/api/debug', async (req, res) => {
                 preview: connectionString.substring(0, 10) + '...' + connectionString.substring(connectionString.length - 10)
             } : null,
             mongooseVersion: mongoose.version,
-            serverSelectionTimeoutMS: 5000
+            serverSelectionTimeoutMS: 30000
         };
 
         res.json(debugInfo);
@@ -141,20 +142,33 @@ app.get('/api/debug', async (req, res) => {
 // Test MongoDB connection endpoint
 app.get('/api/test-connection', async (req, res) => {
     try {
+        // Ensure connection first
+        await connectToDatabase();
+        
+        // Wait a moment for connection to fully establish
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if we have a proper connection
+        if (mongoose.connection.readyState !== 1) {
+            throw new Error(`Connection not ready. State: ${mongoose.connection.readyState}`);
+        }
+        
         // Try to perform a simple database operation
         const testResult = await mongoose.connection.db.admin().ping();
         res.json({
             success: true,
             message: 'MongoDB connection successful',
             pingResult: testResult,
-            readyState: mongoose.connection.readyState
+            readyState: mongoose.connection.readyState,
+            dbName: mongoose.connection.db.databaseName
         });
     } catch (error) {
         res.status(500).json({
             success: false,
             message: 'MongoDB connection failed',
             error: error.message,
-            readyState: mongoose.connection.readyState
+            readyState: mongoose.connection.readyState,
+            stack: error.stack
         });
     }
 });
@@ -1016,22 +1030,25 @@ app.post('/check-username', async (req, res) => {
 // Registration endpoint
 app.post('/register', upload.single('profilePicture'), async (req, res) => {
 
-    console.log('Request body:', req.body);
-    if (req.file) {
-        console.log('Profile picture uploaded:', req.file.filename);
-    } else {
-        console.log('No profile picture uploaded');
-    }
-
-    if (!req.body.username || !req.body.password || !req.body.passkey) {
-        console.error('Missing required fields');
-        return res.status(400).json({ 
-            success: false, 
-            message: 'All fields are required' 
-        });
-    }
-
     try {
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
+        console.log('Request body:', req.body);
+        if (req.file) {
+            console.log('Profile picture uploaded:', req.file.filename);
+        } else {
+            console.log('No profile picture uploaded');
+        }
+
+        if (!req.body.username || !req.body.password || !req.body.passkey) {
+            console.error('Missing required fields');
+            return res.status(400).json({ 
+                success: false, 
+                message: 'All fields are required' 
+            });
+        }
+
         const { username, password, passkey } = req.body;
         const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
 
@@ -1142,22 +1159,25 @@ app.post('/complete-registration', upload.single('profilePicture'), async (req, 
 
 // Login Route
 app.post('/login', async (req, res) => {
-    console.log('POST /login triggered with body:', {
-        username: req.body.username,
-        passwordProvided: !!req.body.password
-    });
-    
-    if (!req.body.username || !req.body.password) {
-        console.log('Missing username or password');
-        return res.status(400).json({ 
-            success: false,
-            message: 'Username and password are required' 
-        });
-    }
-    
-    const { username, password } = req.body;
-
     try {
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
+        console.log('POST /login triggered with body:', {
+            username: req.body.username,
+            passwordProvided: !!req.body.password
+        });
+        
+        if (!req.body.username || !req.body.password) {
+            console.log('Missing username or password');
+            return res.status(400).json({ 
+                success: false,
+                message: 'Username and password are required' 
+            });
+        }
+        
+        const { username, password } = req.body;
+
         console.log('Looking up user in database:', username);
         let user = await User.findOne({ username });
         
