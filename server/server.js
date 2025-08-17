@@ -255,6 +255,158 @@ app.get('/api/test-connection-alt', async (req, res) => {
     }
 });
 
+// API Check if username exists (alternative to /check-username)
+app.post('/api/check-username', async (req, res) => {
+    console.log('POST /api/check-username triggered with:', req.body);
+    res.header('Access-Control-Allow-Origin', '*');
+    
+    try {
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
+        // Wait for database context to be ready
+        let attempts = 0;
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+            console.log(`Waiting for DB context in api/check-username... Attempt ${attempts}`);
+        }
+        
+        if (!mongoose.connection.db) {
+            throw new Error('Database context not available for username check');
+        }
+        
+        if (!req.body || !req.body.username) {
+            console.error('Missing username in request');
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Username is required' 
+            });
+        }
+
+        const username = req.body.username.trim();
+        console.log('✅ API Checking username:', username, 'in database:', mongoose.connection.db.databaseName);
+
+        const existingUser = await User.findOne({ username });
+        console.log('Database query result:', existingUser ? 'User exists' : 'Username available');
+        
+        return res.status(200).json({
+            exists: !!existingUser,
+            message: existingUser ? 'Username already exists.' : 'Username is available.',
+            debug: {
+                database: mongoose.connection.db.databaseName,
+                readyState: mongoose.connection.readyState
+            }
+        });
+    } catch (err) {
+        console.error('❌ API Username check error:', err);
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Server error checking username',
+            error: err.message,
+            debug: {
+                readyState: mongoose.connection.readyState,
+                dbExists: !!mongoose.connection.db
+            }
+        });
+    }
+});
+
+// API Registration endpoint (alternative to /register)
+app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
+
+    try {
+        // Ensure MongoDB connection
+        await connectToDatabase();
+        
+        // Wait for database context to be ready
+        let attempts = 0;
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+            console.log(`Waiting for DB context in api/registration... Attempt ${attempts}`);
+        }
+        
+        if (!mongoose.connection.db) {
+            throw new Error('Database context not available for registration');
+        }
+        
+        console.log('✅ API Database context ready for registration');
+        console.log('Request body:', req.body);
+        if (req.file) {
+            console.log('Profile picture uploaded:', req.file.filename);
+        } else {
+            console.log('No profile picture uploaded');
+        }
+
+        if (!req.body.username || !req.body.password || !req.body.passkey) {
+            console.error('Missing required fields');
+            return res.status(400).json({ 
+                success: false, 
+                message: 'All fields are required' 
+            });
+        }
+
+        const { username, password, passkey } = req.body;
+        const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
+
+        console.log(`🔍 API Checking for existing user: ${username} in database: ${mongoose.connection.db.databaseName}`);
+        
+        // Check for existing user again
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            console.log('Username already exists:', username);
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Username already exists' 
+            });
+        }
+
+        console.log('✅ API Username available, proceeding with registration');
+
+        // Generate RSA key pair
+        const { publicKey, privateKey } = EncryptionUtils.generateRSAKeyPair();
+        
+        // Encrypt private key with passkey
+        console.log('Encrypting private key with passkey...');
+        const encryptedPrivateKey = EncryptionUtils.encryptPrivateKey(privateKey, passkey);
+
+        // Hash password
+        console.log('Hashing password...');
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // Create new user
+        const user = new User({
+            username,
+            password: hashedPassword,
+            passkey,
+            publicKey,
+            encryptedPrivateKey,
+            profilePicture
+        });
+
+        console.log('Saving user to database...');
+        await user.save();
+        console.log('✅ API User created successfully:', username);
+
+        res.status(201).json({ 
+            success: true, 
+            message: 'User registered successfully',
+            debug: {
+                userId: user._id,
+                database: mongoose.connection.db.databaseName
+            }
+        });
+    } catch (error) {
+        console.error('❌ API Registration error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Registration failed',
+            error: error.message 
+        });
+    }
+});
+
 // Simple registration test endpoint (no file upload)
 app.post('/api/test-registration', async (req, res) => {
     try {

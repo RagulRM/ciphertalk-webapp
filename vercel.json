@@ -34,6 +34,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "debug-test.html",
+      "use": "@vercel/static"
+    },
+    {
       "src": "resources/**",
       "use": "@vercel/static"
     }
@@ -49,19 +53,23 @@
     },
     {
       "src": "/check-username",
-      "dest": "server/server.js"
+      "dest": "server/server.js",
+      "methods": ["POST"]
     },
     {
       "src": "/register",
-      "dest": "server/server.js"
+      "dest": "server/server.js",
+      "methods": ["POST"]
     },
     {
       "src": "/login",
-      "dest": "server/server.js"
+      "dest": "server/server.js",
+      "methods": ["POST"]
     },
     {
       "src": "/uploadProfilePicture",
-      "dest": "server/server.js"
+      "dest": "server/server.js",
+      "methods": ["POST"]
     },
     {
       "src": "/steganography",
@@ -94,6 +102,10 @@
     {
       "src": "/registration-test.html",
       "dest": "/registration-test.html"
+    },
+    {
+      "src": "/debug-test.html",
+      "dest": "/debug-test.html"
     },
     {
       "src": "/(.*)",

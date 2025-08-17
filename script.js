@@ -6,6 +6,61 @@ const getServerURL = () => {
     return `${window.location.protocol}//${window.location.hostname}`;
 };
 
+// Debug function for console testing
+window.debugAPI = {
+    async testCheckUsername(username = 'testuser') {
+        try {
+            console.log('🧪 Testing /check-username with:', username);
+            const response = await fetch(`${getServerURL()}/api/check-username`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+            
+            const data = await response.json();
+            console.log('✅ Response status:', response.status);
+            console.log('✅ Response data:', data);
+            return { status: response.status, data };
+        } catch (error) {
+            console.error('❌ Error:', error);
+            return { error: error.message };
+        }
+    },
+    
+    async testDbInspect() {
+        try {
+            console.log('🧪 Testing /api/db-inspect');
+            const response = await fetch(`${getServerURL()}/api/db-inspect`);
+            const data = await response.json();
+            console.log('✅ DB Inspect Response:', data);
+            return data;
+        } catch (error) {
+            console.error('❌ DB Inspect Error:', error);
+            return { error: error.message };
+        }
+    },
+    
+    async testRegistration(username = 'debuguser', password = 'testpass', passkey = 'testkey') {
+        try {
+            console.log('🧪 Testing /api/test-registration');
+            const response = await fetch(`${getServerURL()}/api/test-registration`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, passkey })
+            });
+            
+            const data = await response.json();
+            console.log('✅ Registration Test Response:', data);
+            return { status: response.status, data };
+        } catch (error) {
+            console.error('❌ Registration Test Error:', error);
+            return { error: error.message };
+        }
+    }
+};
+
+console.log('🔧 Debug API loaded! Use: debugAPI.testCheckUsername(), debugAPI.testDbInspect(), debugAPI.testRegistration()');
+
 // Popup system functions
 function showPopup(type, title, message, buttonText = 'OK', callback = null) {
     const overlay = document.getElementById('popupOverlay');
@@ -119,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             // Check if username exists
-            const checkResponse = await fetch(`${getServerURL()}/check-username`, {
+            const checkResponse = await fetch(`${getServerURL()}/api/check-username`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -141,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Proceed with registration
-            const registerResponse = await fetch(`${getServerURL()}/register`, {
+            const registerResponse = await fetch(`${getServerURL()}/api/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
