@@ -65,6 +65,10 @@ const mongoOptions = {
     serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
     socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
     maxPoolSize: 10, // Maintain up to 10 socket connections
+    bufferCommands: false, // Disable mongoose buffering
+    bufferMaxEntries: 0, // Disable mongoose buffering
+    useUnifiedTopology: true,
+    useNewUrlParser: true,
     serverApi: {
         version: '1',
         strict: true,
@@ -74,19 +78,29 @@ const mongoOptions = {
 
 console.log('MongoDB URI:', process.env.MONGODB_URI ? 'SET (length: ' + process.env.MONGODB_URI.length + ')' : 'NOT SET');
 
-mongoose.connect(process.env.MONGODB_URI, mongoOptions)
-    .then(() => {
-        console.log('✅ Connected to MongoDB Database successfully');
-    })
-    .catch((err) => {
-        console.error('❌ Failed to connect to MongoDB Database:', err.message);
-        console.error('Connection string format check:', {
-            hasUsername: process.env.MONGODB_URI?.includes('Ragul'),
-            hasPassword: process.env.MONGODB_URI?.includes('RagulCipher'),
-            hasDatabase: process.env.MONGODB_URI?.includes('ciphertalk'),
-            hasCluster: process.env.MONGODB_URI?.includes('useridcluster')
+// Try to connect with retry logic
+const connectWithRetry = () => {
+    return mongoose.connect(process.env.MONGODB_URI, mongoOptions)
+        .then(() => {
+            console.log('✅ Connected to MongoDB Database successfully');
+        })
+        .catch((err) => {
+            console.error('❌ Failed to connect to MongoDB Database:', err.message);
+            console.error('Connection string format check:', {
+                hasUsername: process.env.MONGODB_URI?.includes('Ragul'),
+                hasPassword: process.env.MONGODB_URI?.includes('RagulCipher'),
+                hasDatabase: process.env.MONGODB_URI?.includes('ciphertalk'),
+                hasCluster: process.env.MONGODB_URI?.includes('useridcluster')
+            });
+            
+            // Retry connection after 5 seconds
+            console.log('⏳ Retrying MongoDB connection in 5 seconds...');
+            setTimeout(connectWithRetry, 5000);
         });
-    });
+};
+
+// Start initial connection
+connectWithRetry();
 
 // Debug endpoint to check MongoDB connection and environment
 app.get('/api/debug', async (req, res) => {
@@ -95,14 +109,53 @@ app.get('/api/debug', async (req, res) => {
         const mongoState = mongoose.connection.readyState;
         const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
         
-        res.json({
+        // Additional debug info
+        const connectionString = process.env.MONGODB_URI;
+        const debugInfo = {
             mongoUri: mongoUri,
             mongoState: states[mongoState] || 'unknown',
             nodeEnv: process.env.NODE_ENV || 'not set',
-            timestamp: new Date().toISOString()
-        });
+            timestamp: new Date().toISOString(),
+            // Connection string analysis (masked for security)
+            connectionAnalysis: connectionString ? {
+                hasProtocol: connectionString.startsWith('mongodb+srv://'),
+                hasUsername: connectionString.includes('Ragul'),
+                hasCluster: connectionString.includes('useridcluster'),
+                hasDatabase: connectionString.includes('/ciphertalk'),
+                hasPassword: connectionString.includes('RagulCipher'),
+                hasRetryWrites: connectionString.includes('retryWrites=true'),
+                length: connectionString.length,
+                // Show first and last 10 characters for debugging
+                preview: connectionString.substring(0, 10) + '...' + connectionString.substring(connectionString.length - 10)
+            } : null,
+            mongooseVersion: mongoose.version,
+            serverSelectionTimeoutMS: 5000
+        };
+
+        res.json(debugInfo);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Test MongoDB connection endpoint
+app.get('/api/test-connection', async (req, res) => {
+    try {
+        // Try to perform a simple database operation
+        const testResult = await mongoose.connection.db.admin().ping();
+        res.json({
+            success: true,
+            message: 'MongoDB connection successful',
+            pingResult: testResult,
+            readyState: mongoose.connection.readyState
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'MongoDB connection failed',
+            error: error.message,
+            readyState: mongoose.connection.readyState
+        });
     }
 });
 
