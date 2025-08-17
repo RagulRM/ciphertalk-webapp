@@ -255,6 +255,31 @@ app.get('/api/test-connection-alt', async (req, res) => {
     }
 });
 
+// Environment debug endpoint
+app.get('/api/env-debug', (req, res) => {
+    const envInfo = {
+        nodeEnv: process.env.NODE_ENV,
+        port: process.env.PORT,
+        mongoUriExists: !!process.env.MONGODB_URI,
+        mongoUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
+        mongoUriPreview: process.env.MONGODB_URI ? 
+            process.env.MONGODB_URI.substring(0, 20) + '...' + process.env.MONGODB_URI.substring(process.env.MONGODB_URI.length - 20) 
+            : 'NOT SET',
+        allEnvKeys: Object.keys(process.env).filter(key => 
+            key.includes('MONGO') || 
+            key.includes('DB') || 
+            key.includes('DATABASE') ||
+            key.includes('URI')
+        ),
+        vercelEnv: process.env.VERCEL,
+        vercelUrl: process.env.VERCEL_URL,
+        processEnvKeys: Object.keys(process.env).length,
+        timestamp: new Date().toISOString()
+    };
+    
+    res.json(envInfo);
+});
+
 // User Schema
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
@@ -1364,11 +1389,14 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
-// Make sure the PORT is defined first
-const PORT = process.env.PORT || 3000;
+// Export for Vercel serverless functions
+module.exports = app;
 
-// Start the server once, using the defined PORT
-app.listen(PORT, async () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-    await testUploadDir();
-});
+// Only start server locally (not in Vercel)
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, async () => {
+        console.log(`Server running at http://localhost:${PORT}`);
+        await testUploadDir();
+    });
+}
