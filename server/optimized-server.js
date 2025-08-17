@@ -319,6 +319,76 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
+// Simple registration test without RSA key generation
+app.post('/api/test-register', async (req, res) => {
+    try {
+        console.log('📝 Test registration request received:', req.body);
+        
+        await connectToDatabase();
+        
+        let attempts = 0;
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+        }
+        
+        if (!mongoose.connection.db) {
+            throw new Error('Database context not available for registration');
+        }
+        
+        console.log('✅ Database context ready for registration');
+
+        if (!req.body.username || !req.body.password || !req.body.passkey) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'All fields are required' 
+            });
+        }
+
+        const { username, password, passkey } = req.body;
+
+        // Check for existing user
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Username already exists' 
+            });
+        }
+
+        console.log('✅ Username available, proceeding with registration');
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // Create new user with dummy keys (no RSA generation)
+        const user = new User({
+            username,
+            password: hashedPassword,
+            passkey,
+            publicKey: 'test-public-key-' + Date.now(),
+            encryptedPrivateKey: 'test-encrypted-private-key-' + Date.now(),
+            profilePicture: 'resources/Default.jpg'
+        });
+
+        await user.save();
+        console.log('✅ User created successfully:', username);
+
+        res.status(201).json({ 
+            success: true, 
+            message: 'User registered successfully (test mode)',
+            userId: user._id
+        });
+    } catch (error) {
+        console.error('❌ Registration error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Registration failed',
+            error: error.message 
+        });
+    }
+});
+
 // Export for Vercel
 module.exports = app;
 
