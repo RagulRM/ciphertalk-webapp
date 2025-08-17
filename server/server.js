@@ -172,13 +172,18 @@ app.post('/api/check-username', async (req, res) => {
         
         // Wait for database context to be ready
         let attempts = 0;
-        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 5) {
+            await new Promise(resolve => setTimeout(resolve, 200));
             attempts++;
         }
         
-        if (!mongoose.connection.db) {
-            throw new Error('Database context not available for username check');
+        if (!mongoose.connection.db || mongoose.connection.readyState !== 1) {
+            console.error('Database not available for username check');
+            return res.status(503).json({
+                success: false,
+                message: 'Database temporarily unavailable. Please check MongoDB Atlas network access settings.',
+                code: 'DATABASE_UNAVAILABLE'
+            });
         }
         
         if (!req.body || !req.body.username) {
@@ -203,10 +208,11 @@ app.post('/api/check-username', async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Username check error:', err);
-        return res.status(500).json({ 
+        return res.status(503).json({ 
             success: false, 
-            message: 'Server error checking username',
+            message: 'Database connection failed. Please check MongoDB Atlas network access.',
             error: err.message,
+            code: 'DATABASE_CONNECTION_ERROR',
             debug: {
                 readyState: mongoose.connection.readyState,
                 dbExists: !!mongoose.connection.db
@@ -224,13 +230,18 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
         
         // Wait for database context to be ready
         let attempts = 0;
-        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 10) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+        while ((!mongoose.connection.db || mongoose.connection.readyState !== 1) && attempts < 5) {
+            await new Promise(resolve => setTimeout(resolve, 200));
             attempts++;
         }
         
-        if (!mongoose.connection.db) {
-            throw new Error('Database context not available for registration');
+        if (!mongoose.connection.db || mongoose.connection.readyState !== 1) {
+            console.error('Database not available for registration');
+            return res.status(503).json({
+                success: false,
+                message: 'Database temporarily unavailable. Please check MongoDB Atlas network access settings.',
+                code: 'DATABASE_UNAVAILABLE'
+            });
         }
         
         if (req.file) {
@@ -1446,8 +1457,53 @@ app.get('/api/health', (req, res) => {
         status: 'healthy',
         environment: process.env.NODE_ENV,
         database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        dbReadyState: mongoose.connection.readyState,
+        dbStates: {
+            0: 'disconnected',
+            1: 'connected',
+            2: 'connecting', 
+            3: 'disconnecting'
+        }
     });
+});
+
+// Simple MongoDB Atlas connectivity test
+app.get('/api/mongo-test', async (req, res) => {
+    try {
+        console.log('Testing MongoDB connection directly...');
+        
+        // Test connection without waiting
+        const startTime = Date.now();
+        await connectToDatabase();
+        const connectionTime = Date.now() - startTime;
+        
+        if (mongoose.connection.readyState === 1) {
+            res.json({
+                success: true,
+                message: 'MongoDB connection successful',
+                connectionTime: `${connectionTime}ms`,
+                database: mongoose.connection.db.databaseName,
+                host: mongoose.connection.host,
+                port: mongoose.connection.port
+            });
+        } else {
+            res.status(503).json({
+                success: false,
+                message: 'MongoDB connection failed',
+                readyState: mongoose.connection.readyState,
+                connectionTime: `${connectionTime}ms`
+            });
+        }
+    } catch (error) {
+        res.status(503).json({
+            success: false,
+            message: 'MongoDB connection error - likely network access issue',
+            error: error.message,
+            errorCode: error.code,
+            suggestion: 'Add 0.0.0.0/0 to MongoDB Atlas Network Access'
+        });
+    }
 });
 
 // Simple test endpoint - no database required
