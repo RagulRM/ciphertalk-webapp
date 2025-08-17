@@ -60,8 +60,19 @@ const resourcesDir = path.join(__dirname, '..', 'resources');
     }
 });
 
-// Connect to MongoDB Atlas
-mongoose.connect(process.env.MONGODB_URI)
+// Connect to MongoDB Atlas with proper serverless options
+const mongoOptions = {
+    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+    socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+    maxPoolSize: 10, // Maintain up to 10 socket connections
+    serverApi: {
+        version: '1',
+        strict: true,
+        deprecationErrors: true,
+    }
+};
+
+mongoose.connect(process.env.MONGODB_URI, mongoOptions)
     .then(() => {
         console.log('Connected to MongoDB Database');
     })
