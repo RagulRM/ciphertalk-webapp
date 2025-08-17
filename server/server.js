@@ -8,7 +8,7 @@ const fs = require('fs');
 const jimp = require('jimp');
 const crypto = require('crypto');
 const NodeRSA = require('node-rsa');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
 
@@ -104,6 +104,16 @@ const connectToDatabase = async () => {
     }
 
     try {
+        // Debug environment variables
+        if (!process.env.MONGODB_URI) {
+            const envCheck = {
+                NODE_ENV: process.env.NODE_ENV,
+                VERCEL: process.env.VERCEL,
+                mongoUri: process.env.MONGODB_URI ? 'DEFINED' : 'UNDEFINED'
+            };
+            console.error('❌ MONGODB_URI not found!', envCheck);
+            throw new Error('MONGODB_URI environment variable is not defined');
+        }
         
         // Add event listeners for debugging
         mongoose.connection.on('connecting', () => {
