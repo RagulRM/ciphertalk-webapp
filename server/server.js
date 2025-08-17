@@ -1370,19 +1370,45 @@ app.get('/api/connection-test', async (req, res) => {
         // Test database connection
         let dbStatus = 'disconnected';
         let dbError = null;
+        let connectionDetails = {};
         
         try {
+            console.log('Testing MongoDB connection...');
             await connectToDatabase();
+            
             if (mongoose.connection.readyState === 1) {
                 // Test a simple database operation
                 const userCount = await User.countDocuments();
                 dbStatus = `connected (${userCount} users)`;
+                
+                // Get connection details
+                connectionDetails = {
+                    readyState: mongoose.connection.readyState,
+                    host: mongoose.connection.host,
+                    port: mongoose.connection.port,
+                    name: mongoose.connection.name
+                };
             } else {
                 dbStatus = `connection state: ${mongoose.connection.readyState}`;
+                connectionDetails = {
+                    readyState: mongoose.connection.readyState,
+                    states: {
+                        0: 'disconnected',
+                        1: 'connected', 
+                        2: 'connecting',
+                        3: 'disconnecting'
+                    }
+                };
             }
         } catch (err) {
             dbStatus = 'connection failed';
             dbError = err.message;
+            connectionDetails = {
+                errorName: err.name,
+                errorCode: err.code,
+                readyState: mongoose.connection.readyState
+            };
+            console.error('Database connection test failed:', err);
         }
         
         res.json({
@@ -1396,6 +1422,7 @@ app.get('/api/connection-test', async (req, res) => {
             mongoConnected: mongoose.connection.readyState === 1,
             dbStatus: dbStatus,
             dbError: dbError,
+            connectionDetails: connectionDetails,
             corsOrigins: allowedOrigins,
             envVars: {
                 MONGODB_URI: process.env.MONGODB_URI ? 'DEFINED' : 'UNDEFINED',
