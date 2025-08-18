@@ -426,12 +426,9 @@ class EncryptionUtils {
         const algorithm = 'aes-256-cbc';
         const key = crypto.scryptSync(passkey, 'salt', 32);
         const iv = crypto.randomBytes(16);
-        
-        const cipher = crypto.createCipher(algorithm, key);
-        cipher.setAutoPadding(true);
+        const cipher = crypto.createCipheriv(algorithm, key, iv);
         let encrypted = cipher.update(privateKey, 'utf8', 'hex');
         encrypted += cipher.final('hex');
-        
         return iv.toString('hex') + ':' + encrypted;
     }
 
@@ -440,16 +437,12 @@ class EncryptionUtils {
         try {
             const algorithm = 'aes-256-cbc';
             const key = crypto.scryptSync(passkey, 'salt', 32);
-            
             const textParts = encryptedPrivateKey.split(':');
             const iv = Buffer.from(textParts.shift(), 'hex');
             const encryptedText = textParts.join(':');
-            
-            const decipher = crypto.createDecipher(algorithm, key);
-            decipher.setAutoPadding(true);
+            const decipher = crypto.createDecipheriv(algorithm, key, iv);
             let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
             decrypted += decipher.final('utf8');
-            
             return decrypted;
         } catch (error) {
             throw new Error('Invalid passkey');
@@ -466,8 +459,7 @@ class EncryptionUtils {
 
     // Encrypt message with AES
     static encryptWithAES(message, aesKey, iv) {
-        const cipher = crypto.createCipher('aes-256-cbc', aesKey);
-        cipher.setAutoPadding(true);
+        const cipher = crypto.createCipheriv('aes-256-cbc', aesKey, iv);
         let encrypted = cipher.update(message, 'utf8', 'hex');
         encrypted += cipher.final('hex');
         return encrypted;
@@ -475,8 +467,7 @@ class EncryptionUtils {
 
     // Decrypt message with AES
     static decryptWithAES(encryptedMessage, aesKey, iv) {
-        const decipher = crypto.createDecipher('aes-256-cbc', aesKey);
-        decipher.setAutoPadding(true);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', aesKey, iv);
         let decrypted = decipher.update(encryptedMessage, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
         return decrypted;
