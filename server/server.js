@@ -8,18 +8,9 @@ const fs = require('fs');
 const jimp = require('jimp');
 const crypto = require('crypto');
 const NodeRSA = require('node-rsa');
-const { v2: cloudinary } = require('cloudinary');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
-
-// Configure Cloudinary for cloud storage
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true
-});
 
 // Middleware
 app.use(express.json());
@@ -76,37 +67,23 @@ if (!process.env.VERCEL && !fs.existsSync(resourcesDir)) {
     fs.mkdirSync(resourcesDir, { recursive: true });
 }
 
-// Multer configuration with cloud storage support
-const storage = multer.memoryStorage(); // Use memory storage for cloud uploads
-
-const upload = multer({ 
-    storage: storage,
-    limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB limit for cloud storage
-        fieldSize: 2 * 1024 * 1024 // 2MB field size
+// Multer configuration with serverless support
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Use /tmp in Vercel serverless, local uploads directory otherwise
+        const uploadPath = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        const outName = Date.now() + '-' + file.originalname;
+        cb(null, outName);
     }
 });
 
-// Helper function to upload buffer to Cloudinary
-const uploadToCloudinary = (buffer, folder = 'ciphertalk') => {
-    return new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-            {
-                folder: folder,
-                resource_type: 'auto',
-                format: 'png', // Force PNG for steganography
-                quality: 100 // Preserve quality for steganography
-            },
-            (error, result) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(result);
-                }
-            }
-        ).end(buffer);
-    });
-};
+const upload = multer({ storage: storage });
 
 // Connect to MongoDB Atlas with optimized serverless options
 const mongoOptions = {
@@ -267,9 +244,9 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
             });
         }
         
-        if (req.file) {
-        } else {
-        }
+    // Accept registration with or without profile picture
+    // If profilePicture is not uploaded, use default
+    // If request is JSON, req.file will be undefined
 
         if (!req.body.username || !req.body.password || !req.body.passkey) {
             console.error('Missing required fields');
@@ -280,7 +257,7 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
         }
 
         const { username, password, passkey } = req.body;
-        const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
+    const profilePicture = 'resources/Default.jpg';
 
         
         // Check for existing user again
@@ -416,7 +393,6 @@ const MessageSchema = new mongoose.Schema({
     encryptedAESKey: String,
     iv:             String,
     originalText:   String,
-    cloudinary_public_id: String, // For cloud-stored files
     timestamp:      { type: Date, default: Date.now }
 });
 
@@ -738,20 +714,23 @@ app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
         // Apply LSB steganography
         const stegoImage = await embedMessageInImage(image, message, bits);
         
-        // Convert Jimp image to buffer
-        const imageBuffer = await stegoImage.getBufferAsync(jimp.MIME_PNG);
+        // Generate unique filename
+        const outputFilename = `stego_${Date.now()}.png`;
+        const outputPath = path.join(stegoDir, outputFilename);
         
-        // Upload to Cloudinary
-        const cloudinaryResult = await uploadToCloudinary(imageBuffer, 'stego');
+        // Save the processed image
+        await stegoImage.writeAsync(outputPath);
+        
+        // Clean up original uploaded file
+        fs.unlinkSync(req.file.path);
 
-        // Return the cloud URL
-        const imageUrl = cloudinaryResult.secure_url;
+        // Return the URL that can be used to access the image
+        const imageUrl = `/uploads/stego/${outputFilename}`;
 
         res.json({
             success: true,
             imageUrl: imageUrl,
-            cloudinary_public_id: cloudinaryResult.public_id,
-            message: 'Steganography successful - image stored in cloud'
+            message: 'Steganography successful'
         });
     } catch (error) {
         console.error('Steganography error:', error);
@@ -820,33 +799,40 @@ app.post('/api/messages/stego/send', upload.single('image'), async (req, res) =>
         // Apply LSB steganography with encrypted payload
         const stegoImage = await embedMessageInImage(image, payload, bits);
         
-        // Convert Jimp image to buffer
-        const imageBuffer = await stegoImage.getBufferAsync(jimp.MIME_PNG);
+        // Generate unique filename
+        const outputFilename = `stego_${Date.now()}.png`;
+        const outputPath = path.join(stegoDir, outputFilename);
         
-        // Upload to Cloudinary
-        const cloudinaryResult = await uploadToCloudinary(imageBuffer, 'stego');
+        // Save the processed image
+        await stegoImage.writeAsync(outputPath);
+        
+        // Clean up original uploaded file
+        fs.unlinkSync(req.file.path);
 
-        // Save message to database with cloud URL
+        // Save message to database
         const newMessage = new Message({
             sender,
             receiver,
-            content: cloudinaryResult.secure_url,
+            content: `/uploads/stego/${outputFilename}`,
             type: 'stego',
             encryptedAESKey,
             iv: iv.toString('hex'),
-            originalText: message,
-            cloudinary_public_id: cloudinaryResult.public_id
+            originalText: message
         });
         await newMessage.save();
 
         res.json({
             success: true,
-            imageUrl: cloudinaryResult.secure_url,
-            cloudinary_public_id: cloudinaryResult.public_id,
-            message: 'RSA-AES steganography message sent successfully - stored in cloud'
+            imageUrl: `/uploads/stego/${outputFilename}`,
+            message: 'RSA-AES steganography message sent successfully'
         });
     } catch (error) {
         console.error('RSA-AES steganography error:', error);
+        
+        // Clean up files on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
         
         res.status(500).json({
             success: false,
@@ -1235,7 +1221,7 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
         }
 
         const { username, password, passkey } = req.body;
-        const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
+    const profilePicture = 'resources/Default.jpg';
 
         
         // Check for existing user again
@@ -1293,7 +1279,7 @@ app.post('/register', upload.single('profilePicture'), async (req, res) => {
 // Complete registration
 app.post('/complete-registration', upload.single('profilePicture'), async (req, res) => {
     const { username, password, passkey } = req.body;
-    const profilePicture = req.file ? `/uploads/${req.file.filename}` : 'resources/Default.jpg';
+    const profilePicture = 'resources/Default.jpg';
 
     if (!username || !password || !passkey) {
         return res.status(400).json({ success: false, message: 'All fields are required' });
