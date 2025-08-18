@@ -6,6 +6,26 @@ const getServerURL = () => {
     return `${window.location.protocol}//${window.location.hostname}`;
 };
 
+// Warmup function to prevent cold starts
+const warmupServer = async () => {
+    try {
+        console.log('🔥 Warming up server...');
+        const response = await fetch(`${getServerURL()}/api/warmup`, {
+            method: 'GET',
+            cache: 'no-cache'
+        });
+        const data = await response.json();
+        console.log('✅ Server warmed up:', data);
+    } catch (error) {
+        console.log('⚠️ Warmup failed (normal for first load):', error.message);
+    }
+};
+
+// Warmup server when page loads
+if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    warmupServer();
+}
+
 // Debug function for console testing
 window.debugAPI = {
     async testCheckUsername(username = 'testuser') {
@@ -233,18 +253,44 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Login attempt:', { username, serverURL: getServerURL() });
         
+        // Show loading state
+        showErrorPopup('Connecting', 'Connecting to server...', false);
+        
         try {
-            const response = await fetch(`${getServerURL()}/api/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password })
-            });
+            // Retry mechanism for cold starts
+            let response;
+            let attempt = 0;
+            const maxAttempts = 2;
+            
+            while (attempt < maxAttempts) {
+                try {
+                    response = await fetch(`${getServerURL()}/api/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ username, password }),
+                        timeout: 30000 // 30 second timeout for cold starts
+                    });
+                    break; // Success, exit retry loop
+                } catch (fetchError) {
+                    attempt++;
+                    if (attempt < maxAttempts) {
+                        showErrorPopup('Server Starting', `Server starting up... Retrying (${attempt}/${maxAttempts})`, false);
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+                    } else {
+                        throw fetchError;
+                    }
+                }
+            }
             
             console.log('Login response:', response.status, response.statusText);
             
             if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                if (response.status === 503 && errorData?.code === 'DATABASE_NOT_READY') {
+                    throw new Error('Server is starting up. Please try again in a moment.');
+                }
                 throw new Error(`Server error: ${response.status} ${response.statusText}`);
             }
             
@@ -263,7 +309,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Login error:', error);
-            showErrorPopup('Login Error', 'Unable to connect to server. Please check your connection and try again.');
+            if (error.message.includes('Server is starting up')) {
+                showErrorPopup('Server Starting', 'The server is starting up. Please try again in a moment.');
+            } else {
+                showErrorPopup('Login Error', 'Unable to connect to server. Please check your connection and try again.');
+            }
         }
     });
 
