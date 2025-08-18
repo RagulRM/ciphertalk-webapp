@@ -8,9 +8,18 @@ const fs = require('fs');
 const jimp = require('jimp');
 const crypto = require('crypto');
 const NodeRSA = require('node-rsa');
+const { v2: cloudinary } = require('cloudinary');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
+
+// Configure Cloudinary for cloud storage
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true
+});
 
 // Middleware
 app.use(express.json());
@@ -67,23 +76,37 @@ if (!process.env.VERCEL && !fs.existsSync(resourcesDir)) {
     fs.mkdirSync(resourcesDir, { recursive: true });
 }
 
-// Multer configuration with serverless support
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        // Use /tmp in Vercel serverless, local uploads directory otherwise
-        const uploadPath = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        const outName = Date.now() + '-' + file.originalname;
-        cb(null, outName);
+// Multer configuration with cloud storage support
+const storage = multer.memoryStorage(); // Use memory storage for cloud uploads
+
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit for cloud storage
+        fieldSize: 2 * 1024 * 1024 // 2MB field size
     }
 });
 
-const upload = multer({ storage: storage });
+// Helper function to upload buffer to Cloudinary
+const uploadToCloudinary = (buffer, folder = 'ciphertalk') => {
+    return new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+            {
+                folder: folder,
+                resource_type: 'auto',
+                format: 'png', // Force PNG for steganography
+                quality: 100 // Preserve quality for steganography
+            },
+            (error, result) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(result);
+                }
+            }
+        ).end(buffer);
+    });
+};
 
 // Connect to MongoDB Atlas with optimized serverless options
 const mongoOptions = {
@@ -393,6 +416,7 @@ const MessageSchema = new mongoose.Schema({
     encryptedAESKey: String,
     iv:             String,
     originalText:   String,
+    cloudinary_public_id: String, // For cloud-stored files
     timestamp:      { type: Date, default: Date.now }
 });
 
@@ -714,23 +738,20 @@ app.post('/api/messages/stego', upload.single('image'), async (req, res) => {
         // Apply LSB steganography
         const stegoImage = await embedMessageInImage(image, message, bits);
         
-        // Generate unique filename
-        const outputFilename = `stego_${Date.now()}.png`;
-        const outputPath = path.join(stegoDir, outputFilename);
+        // Convert Jimp image to buffer
+        const imageBuffer = await stegoImage.getBufferAsync(jimp.MIME_PNG);
         
-        // Save the processed image
-        await stegoImage.writeAsync(outputPath);
-        
-        // Clean up original uploaded file
-        fs.unlinkSync(req.file.path);
+        // Upload to Cloudinary
+        const cloudinaryResult = await uploadToCloudinary(imageBuffer, 'stego');
 
-        // Return the URL that can be used to access the image
-        const imageUrl = `/uploads/stego/${outputFilename}`;
+        // Return the cloud URL
+        const imageUrl = cloudinaryResult.secure_url;
 
         res.json({
             success: true,
             imageUrl: imageUrl,
-            message: 'Steganography successful'
+            cloudinary_public_id: cloudinaryResult.public_id,
+            message: 'Steganography successful - image stored in cloud'
         });
     } catch (error) {
         console.error('Steganography error:', error);
@@ -799,40 +820,33 @@ app.post('/api/messages/stego/send', upload.single('image'), async (req, res) =>
         // Apply LSB steganography with encrypted payload
         const stegoImage = await embedMessageInImage(image, payload, bits);
         
-        // Generate unique filename
-        const outputFilename = `stego_${Date.now()}.png`;
-        const outputPath = path.join(stegoDir, outputFilename);
+        // Convert Jimp image to buffer
+        const imageBuffer = await stegoImage.getBufferAsync(jimp.MIME_PNG);
         
-        // Save the processed image
-        await stegoImage.writeAsync(outputPath);
-        
-        // Clean up original uploaded file
-        fs.unlinkSync(req.file.path);
+        // Upload to Cloudinary
+        const cloudinaryResult = await uploadToCloudinary(imageBuffer, 'stego');
 
-        // Save message to database
+        // Save message to database with cloud URL
         const newMessage = new Message({
             sender,
             receiver,
-            content: `/uploads/stego/${outputFilename}`,
+            content: cloudinaryResult.secure_url,
             type: 'stego',
             encryptedAESKey,
             iv: iv.toString('hex'),
-            originalText: message
+            originalText: message,
+            cloudinary_public_id: cloudinaryResult.public_id
         });
         await newMessage.save();
 
         res.json({
             success: true,
-            imageUrl: `/uploads/stego/${outputFilename}`,
-            message: 'RSA-AES steganography message sent successfully'
+            imageUrl: cloudinaryResult.secure_url,
+            cloudinary_public_id: cloudinaryResult.public_id,
+            message: 'RSA-AES steganography message sent successfully - stored in cloud'
         });
     } catch (error) {
         console.error('RSA-AES steganography error:', error);
-        
-        // Clean up files on error
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
         
         res.status(500).json({
             success: false,
